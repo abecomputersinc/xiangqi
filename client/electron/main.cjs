@@ -7,15 +7,21 @@ const { randomBytes } = require("node:crypto");
 
 const ROOT = path.resolve(__dirname, "../..");
 const CLIENT_ROOT = path.resolve(__dirname, "..");
-const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : path.join(ROOT, "pikafish");
-const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : path.join(ROOT, "pikafish.nnue");
-const pgnRoot = path.join(CLIENT_ROOT, "pgns");
-const pgnDbPath = path.join(pgnRoot, "library.sqlite");
 const sqliteBin = process.env.SQLITE_BIN || "/usr/bin/sqlite3";
 
 const SERVER_URL = process.env.XIANGQI_SERVER_URL || "http://129.153.61.43:4173";
 const ENGINE_TIMEOUT_MS = Number(process.env.PIKAFISH_TIMEOUT_MS || 5000);
 const ENGINE_MOVETIME_MS = Number(process.env.PIKAFISH_MOVETIME_MS || 500);
+
+function bundledPath(...parts) {
+  return app.isPackaged ? path.join(process.resourcesPath, ...parts) : path.join(ROOT, ...parts);
+}
+
+const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath("pikafish");
+const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
+const pgnDbPath = app.isPackaged
+  ? path.join(process.resourcesPath, "pgns", "library.sqlite")
+  : path.join(CLIENT_ROOT, "pgns", "library.sqlite");
 
 function sideFromFen(fen) {
   return fen.trim().split(/\s+/)[1] || "w";

@@ -7,10 +7,47 @@
   "scripts": {
     "server": "node server/server.js",
     "build:pgn-db": "node scripts/build-pgn-sqlite.cjs",
+    "dist:mac": "electron-builder --mac dmg zip",
     "start": "electron .",
     "electron": "electron ."
   },
+  "build": {
+    "appId": "ca.tomliu.xiangqi",
+    "productName": "Pikafish Xiangqi",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "client/**/*",
+      "package.json",
+      "!client/pgns/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "pikafish",
+        "to": "pikafish"
+      },
+      {
+        "from": "pikafish.nnue",
+        "to": "pikafish.nnue"
+      },
+      {
+        "from": "client/pgns/library.sqlite",
+        "to": "pgns/library.sqlite"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  },
   "devDependencies": {
-    "electron": "^29.0.0"
+    "electron": "^29.0.0",
+    "electron-builder": "^26.8.1"
   }
 }

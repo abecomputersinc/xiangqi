@@ -98,6 +98,22 @@ HOST=0.0.0.0 PORT=4173 npm run server
 XIANGQI_SERVER_URL=http://YOUR_COMPUTER_IP:4173 npm start
 ```
 
+## Build macOS Client
+
+The macOS package bundles:
+
+- `pikafish`
+- `pikafish.nnue`
+- `client/pgns/library.sqlite`
+
+Build unsigned macOS DMG and ZIP artifacts:
+
+```sh
+npm run dist:mac
+```
+
+The output is written to `dist/`. Because the app is unsigned and not notarized, macOS may require right-clicking the app and choosing Open the first time.
+
 ## Online Server
 
 The server exposes:
@@ -183,6 +199,7 @@ node --check client/electron/main.cjs
 node --check client/electron/preload.cjs
 node --check server/server.js
 node --check scripts/build-pgn-sqlite.cjs
+npm run dist:mac
 ```
 
 ## Publish Notes
@@ -192,6 +209,7 @@ Before publishing to GitHub:
 - Do not commit private keys, tokens, or deployment credentials.
 - Do not commit production `server/data/users.json`.
 - Decide how to distribute `client/pgns/library.sqlite`. It is large and is excluded from the source repo by default.
+- macOS release artifacts can include the engine and PGN database even though those local assets are excluded from source commits.
 - Make sure `pikafish` and `pikafish.nnue` licensing and distribution are acceptable for your repository.
 
 ## License
