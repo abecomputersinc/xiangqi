@@ -196,4 +196,4 @@ Before publishing to GitHub:
 
 ## License
 
-Add a license before publishing if this repository is intended for public use.
+MIT License. See [LICENSE](LICENSE).
