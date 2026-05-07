@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pikafish Xiangqi</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="board-zone">
+        <div class="board-wrap">
+          <div class="files files-top" aria-hidden="true">
+            <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span><span>i</span>
+          </div>
+          <div id="board" class="board" aria-label="Xiangqi board"></div>
+          <div class="files" aria-hidden="true">
+            <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span><span>i</span>
+          </div>
+        </div>
+        <div class="fen-display">
+          <code id="fenText" title="Click to copy">—</code>
+          <button id="fenCopyBtn" type="button" class="link-btn" title="Copy FEN">copy</button>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="profile-panel">
+          <div>
+            <span class="profile-label">Player</span>
+            <strong id="profileName">Guest</strong>
+          </div>
+          <div>
+            <span class="profile-label">Level</span>
+            <strong id="profileLevel">1-1 Beginner</strong>
+          </div>
+          <button id="loginBtn" type="button">Login</button>
+        </section>
+
+        <section class="pgn-nav" id="pgnNav" hidden>
+          <h2>PGN replay</h2>
+          <div class="pgn-nav-row">
+            <button id="pgnFirstBtn" type="button" title="Start">⏮</button>
+            <button id="pgnPrevBtn" type="button" title="Previous">◀</button>
+            <button id="pgnNextBtn" type="button" title="Next">▶</button>
+            <button id="pgnLastBtn" type="button" title="End">⏭</button>
+          </div>
+          <p id="pgnPosition" class="pgn-position">Move 0 / 0</p>
+          <p id="pgnLastMove" class="pgn-last-move"></p>
+          <button id="pgnImportAgain" type="button" class="link-btn">Import another PGN</button>
+        </section>
+
+        <section class="status-bar">
+          <p id="statusText">Loading engine...</p>
+          <div class="turn-pill" id="turnPill">Red to move</div>
+        </section>
+
+        <section class="clocks" id="clocks">
+          <h2>Clock</h2>
+          <div class="clock-row" id="clockRowRed">
+            <span class="dot red" aria-hidden="true"></span>
+            <span class="clock-label">Red</span>
+            <span class="clock-time" id="redClockBase">15:00</span>
+            <span class="clock-move" id="redClockMove">+0:30</span>
+          </div>
+          <div class="clock-row" id="clockRowBlack">
+            <span class="dot black" aria-hidden="true"></span>
+            <span class="clock-label">Black</span>
+            <span class="clock-time" id="blackClockBase">15:00</span>
+            <span class="clock-move" id="blackClockMove">+0:30</span>
+          </div>
+          <p class="clock-hint" hidden>15:00 total · max 1:30/move (first 3: 0:30) — step time also burns total</p>
+        </section>
+
+        <section class="controls" hidden>
+          <label>
+            <select id="modeSelect">
+              <option value="ai">User vs AI</option>
+              <option value="human">Human vs Human (local)</option>
+              <option value="online">User vs User (online)</option>
+              <option value="pgn">PGN viewer</option>
+            </select>
+          </label>
+          <label>
+            You play
+            <select id="playerSide">
+              <option value="red">Red</option>
+              <option value="black">Black</option>
+            </select>
+          </label>
+          <label>
+            Engine depth
+            <input id="depthInput" type="range" min="3" max="20" value="20" />
+            <span id="depthLabel">20</span>
+          </label>
+          <button id="newGameBtn" type="button">New Game</button>
+        </section>
+
+        <section class="scoreboard">
+          <div class="score-head">
+            <span>Realtime score</span>
+            <strong id="evalText">0.00</strong>
+          </div>
+          <div class="bar" aria-hidden="true">
+            <div id="blackBar"></div>
+            <div id="redBar"></div>
+          </div>
+          <div class="score-labels">
+            <span>Black</span>
+            <span>Red</span>
+          </div>
+        </section>
+
+        <section class="analysis">
+          <h2>Move analysis</h2>
+          <div id="moveScore" class="move-score">Make a move to see Pikafish’s score.</div>
+          <div class="pv" id="pvLine" hidden></div>
+        </section>
+
+        <section class="history" hidden>
+          <h2>Moves</h2>
+          <ol id="moveList"></ol>
+        </section>
+
+        <section class="actions-bar">
+          <button id="undoBtn" type="button">Undo</button>
+          <button id="downloadPgnBtn" type="button" hidden>Download PGN</button>
+          <button id="exitBtn" type="button" class="danger-btn">Exit</button>
+        </section>
+      </aside>
+    </main>
+
+    <div id="startupOverlay" class="overlay" hidden>
+      <div class="overlay-content overlay-content--narrow" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
+        <div id="startupModeStep">
+          <h2 id="startupTitle">Choose a mode</h2>
+          <p class="startup-hint">Pick how you want to play.</p>
+          <div id="startupAuthActions" class="startup-auth-actions">
+            <button id="startupLoginBtn" type="button">Login</button>
+            <button id="startupSignupBtn" type="button">Sign up</button>
+          </div>
+          <div class="startup-options">
+            <button type="button" class="startup-option" data-mode="ai">
+              <strong>Vs AI</strong>
+              <span>Play against Pikafish on this device</span>
+            </button>
+            <button type="button" class="startup-option" data-mode="human">
+              <strong>Vs Human (local)</strong>
+              <span>Two players on the same screen</span>
+            </button>
+            <button type="button" class="startup-option" data-mode="online">
+              <strong>Vs Human (online)</strong>
+              <span>Match up over the internet</span>
+            </button>
+            <button type="button" class="startup-option" data-mode="pgn">
+              <strong>PGN viewer</strong>
+              <span>Import a game and step through it</span>
+            </button>
+          </div>
+        </div>
+        <div id="startupSideStep" hidden>
+          <h2>Choose your side</h2>
+          <p class="startup-hint">Red moves first.</p>
+          <div class="startup-options">
+            <button type="button" class="startup-option startup-side-option" data-side="red">
+              <strong>Play Red</strong>
+              <span>Move first</span>
+            </button>
+            <button type="button" class="startup-option startup-side-option" data-side="black">
+              <strong>Play Black</strong>
+              <span>Pikafish moves first</span>
+            </button>
+          </div>
+          <button id="startupSideBack" type="button" class="link-btn">← Back</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="loginOverlay" class="overlay" hidden>
+      <div class="overlay-content overlay-content--narrow" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <button id="loginCloseBtn" class="overlay-close" type="button" aria-label="Close">×</button>
+        <h2 id="loginTitle">Login</h2>
+        <p class="startup-hint">Login with an existing account or create a new one.</p>
+        <form id="loginForm" class="login-form">
+          <label class="stack-label">
+            Username
+            <input id="loginName" type="text" maxlength="20" placeholder="Your name" autocomplete="username" />
+          </label>
+          <label class="stack-label">
+            Password
+            <input id="loginPassword" type="password" minlength="4" placeholder="Password" autocomplete="current-password" />
+          </label>
+          <p id="loginStatus" class="level-hint">Level is earned in online matches.</p>
+          <div class="button-row">
+            <button id="loginSaveBtn" type="submit">Login</button>
+            <button id="signupBtn" type="button">Sign up</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="pgnOverlay" class="overlay" hidden>
+      <div class="overlay-content overlay-content--library" role="dialog" aria-modal="true" aria-labelledby="pgnTitle">
+        <button id="pgnOverlayClose" class="overlay-close" type="button" aria-label="Close">×</button>
+        <h2 id="pgnTitle">Import PGN</h2>
+        <p class="startup-hint">Search the study library, paste PGN text, or load a .pgn file.</p>
+        <div id="pgnLibraryPanel" class="pgn-library" hidden>
+          <div class="pgn-library-controls">
+            <input id="pgnSearchInput" type="search" placeholder="Search event, player, date" />
+            <select id="pgnOpeningSelect">
+              <option value="">All openings</option>
+            </select>
+          </div>
+          <div id="pgnLibraryCount" class="pgn-library-count">Loading games...</div>
+          <div id="pgnLibraryResults" class="pgn-library-results"></div>
+        </div>
+        <textarea id="pgnInput" rows="10" placeholder="[Event &quot;...&quot;]&#10;1. C3-C4 C9-E7 2. ..."></textarea>
+        <div class="button-row">
+          <label class="file-pick">
+            <span>Load file</span>
+            <input id="pgnFile" type="file" accept=".pgn,.pgns,.txt,text/plain" hidden />
+          </label>
+          <button id="pgnLoadBtn" type="button">Load PGN</button>
+        </div>
+        <p id="pgnStatus" class="online-status"></p>
+      </div>
+    </div>
+
+    <div id="onlineOverlay" class="overlay" hidden>
+      <div class="overlay-content" role="dialog" aria-modal="true" aria-labelledby="onlineOverlayTitle">
+        <button id="overlayCloseBtn" class="overlay-close" type="button" aria-label="Close">×</button>
+        <section class="online" id="onlinePanel">
+          <h2 id="onlineOverlayTitle">Online play</h2>
+          <div id="onlineLobby" class="online-lobby">
+            <label>
+              Account
+              <input id="onlineNickname" type="text" maxlength="20" placeholder="Login first" readonly />
+            </label>
+            <div class="button-row online-match-buttons">
+              <button id="onlineCreateBtn" type="button">Create room</button>
+              <button id="onlineQueueBtn" type="button">Random match</button>
+              <button id="onlineRankedQueueBtn" type="button">Rank match</button>
+            </div>
+            <div class="online-join">
+              <input id="onlineJoinCode" type="text" maxlength="6" placeholder="Room code" autocomplete="off" />
+              <button id="onlineJoinBtn" type="button">Join</button>
+              <button id="onlineSpectateBtn" type="button">Spectate</button>
+            </div>
+            <p id="onlineLobbyStatus" class="online-status"></p>
+          </div>
+
+          <div id="onlineMatch" class="online-match" hidden>
+            <div class="online-room">
+              <div>
+                <span class="online-label">Room</span>
+                <strong id="onlineRoomCode">—</strong>
+                <button id="onlineCopyCode" type="button" class="link-btn" title="Copy code">copy</button>
+              </div>
+              <button id="onlineLeaveBtn" type="button" class="danger-btn">Leave</button>
+            </div>
+            <div class="online-players">
+              <div class="online-player" id="onlinePlayerRed">
+                <span class="dot red" aria-hidden="true"></span>
+                <span class="online-name" data-empty>Waiting…</span>
+              </div>
+              <div class="online-player" id="onlinePlayerBlack">
+                <span class="dot black" aria-hidden="true"></span>
+                <span class="online-name" data-empty>Waiting…</span>
+              </div>
+            </div>
+            <p id="onlineMatchStatus" class="online-status"></p>
+            <div class="button-row">
+              <button id="onlineRematchBtn" type="button" hidden>Rematch</button>
+              <button id="onlineResignBtn" type="button" class="danger-btn" hidden>Resign</button>
+            </div>
+            <p id="onlineSpectators" class="online-spectators"></p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

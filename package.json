@@ -1,0 +1,16 @@
+{
+  "name": "pikafish-xiangqi",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "client/electron/main.cjs",
+  "scripts": {
+    "server": "node server/server.js",
+    "build:pgn-db": "node scripts/build-pgn-sqlite.cjs",
+    "start": "electron .",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^29.0.0"
+  }
+}

@@ -1,0 +1,23 @@
+node_modules/
+.DS_Store
+**/.DS_Store
+
+# Large local/runtime assets
+pikafish
+pikafish.nnue
+client/pgns/*.sqlite
+client/pgns/*.sqlite-*
+
+# Runtime data
+server/data/
+
+# Local secrets and environment files
+.env
+.env.*
+*.pem
+*.key
+
+# Logs and temporary files
+*.log
+tmp/
+dist/
