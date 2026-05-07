@@ -19,6 +19,7 @@ function bundledPath(...parts) {
 
 const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath("pikafish");
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
+const engineCwd = app.isPackaged ? process.resourcesPath : ROOT;
 const pgnDbPath = app.isPackaged
   ? path.join(process.resourcesPath, "pgns", "library.sqlite")
   : path.join(CLIENT_ROOT, "pgns", "library.sqlite");
@@ -74,7 +75,7 @@ function runPikafish(fen, { multipv = 1 } = {}) {
     if (!fs.existsSync(enginePath)) return reject(new Error("The pikafish executable was not found."));
     if (!fs.existsSync(nnuePath)) return reject(new Error("pikafish.nnue is missing beside the engine."));
 
-    const engine = spawn(enginePath, [], { cwd: ROOT, stdio: ["pipe", "pipe", "pipe"] });
+    const engine = spawn(enginePath, [], { cwd: engineCwd, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
     let settled = false;
     const timeout = setTimeout(() => {
