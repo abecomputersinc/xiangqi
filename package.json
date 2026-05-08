@@ -1,6 +1,6 @@
 {
   "name": "xiangqi",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "main": "client/electron/main.cjs",
@@ -8,10 +8,10 @@
     "server": "node server/server.js",
     "build:client": "tsc --project tsconfig.json",
     "check:client": "tsc --project tsconfig.json --noEmit",
-    "dist:mac": "npm run build:client && electron-builder --mac dmg zip",
-    "dist:mac:arm64": "npm run build:client && electron-builder --mac dmg zip --arm64",
-    "dist:linux": "npm run build:client && electron-builder --linux AppImage deb tar.gz",
-    "dist:win": "npm run build:client && electron-builder --win nsis zip --x64",
+    "dist:mac": "npm run build:client && electron-builder --mac dmg zip --publish never",
+    "dist:mac:arm64": "npm run build:client && electron-builder --mac dmg zip --arm64 --publish never",
+    "dist:linux": "npm run build:client && electron-builder --linux AppImage deb tar.gz --publish never",
+    "dist:win": "npm run build:client && electron-builder --win nsis zip --x64 --publish never",
     "start": "npm run build:client && electron .",
     "electron": "npm run build:client && electron ."
   },
