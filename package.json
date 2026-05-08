@@ -32,7 +32,7 @@
     ],
     "mac": {
       "category": "public.app-category.games",
-      "identity": "-",
+      "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extraResources": [
