@@ -1,4 +1,4 @@
-# Pikafish Xiangqi
+# xiangqi
 
 An Electron Xiangqi app with local Pikafish analysis, online match play, server-owned user levels, and a searchable PGN study library.
 

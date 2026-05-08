@@ -525,7 +525,7 @@ function buildPgn() {
         : "Xiangqi Game";
   const headers = [
     ["Event", eventName],
-    ["Site", "Pikafish Xiangqi"],
+    ["Site", "xiangqi"],
     ["Date", pgnDate()],
     ["Red", pgnPlayerName("red")],
     ["Black", pgnPlayerName("black")],

@@ -119,7 +119,7 @@ function createWindow() {
     height: 920,
     minWidth: 900,
     minHeight: 700,
-    title: "Pikafish Xiangqi",
+    title: "xiangqi",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

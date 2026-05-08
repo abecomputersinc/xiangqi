@@ -1,5 +1,5 @@
 {
-  "name": "pikafish-xiangqi",
+  "name": "xiangqi",
   "version": "1.0.2",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "ca.tomliu.xiangqi",
-    "productName": "Pikafish Xiangqi",
+    "productName": "xiangqi",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
     "files": [
