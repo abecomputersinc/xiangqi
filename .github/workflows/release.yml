@@ -315,7 +315,26 @@ jobs:
           fs.writeFileSync(`dist/${process.env.PLATFORM}-sha256.txt`, `${lines.join("\n")}\n`);
           NODE
 
+      - name: Upload macOS assets to GitHub release
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          gh release view "${tag}" >/dev/null 2>&1 || \
+            gh release create "${tag}" \
+              --title "xiangqi ${tag}" \
+              --notes "Automated release artifacts for Windows, Linux, and macOS ARM64."
+          gh release upload "${tag}" \
+            dist/*.dmg \
+            dist/*.zip \
+            dist/macos-arm64-sha256.txt \
+            --clobber
+
       - name: Upload workflow artifacts
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.upload_to_release }}
         uses: actions/upload-artifact@v4
         with:
           name: xiangqi-macos-arm64-${{ env.RELEASE_TAG }}
