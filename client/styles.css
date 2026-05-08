@@ -540,97 +540,82 @@ label {
   resize: vertical;
 }
 
-.pgn-library {
+.pgn-drop-zone {
   display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
+  place-items: center;
+  min-height: 54px;
+  margin-bottom: 10px;
+  border: 1px dashed rgba(37, 26, 17, 0.3);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.45);
 }
 
-.pgn-library-controls {
+.pgn-drop-zone.is-dragging {
+  border-color: rgba(154, 69, 35, 0.7);
+  background: rgba(154, 69, 35, 0.08);
+  color: var(--ink);
+}
+
+.pgn-path-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  margin: 10px 0;
 }
 
-.pgn-library-controls input,
-.pgn-library-controls select {
+.pgn-path-row input {
   min-width: 0;
   height: 38px;
+  box-sizing: border-box;
   padding: 0 10px;
-  border: 1px solid rgba(37, 26, 17, 0.18);
+  border: 1px solid rgba(37, 26, 17, 0.2);
   border-radius: 6px;
   background: white;
   color: var(--ink);
 }
 
-.pgn-library-count {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.pgn-library-results {
+.pgn-game-list {
   display: grid;
   gap: 6px;
-  min-width: 0;
-  max-height: 230px;
+  max-height: 220px;
+  margin: 10px 0;
   overflow: auto;
 }
 
-.pgn-library-game {
+.pgn-game-option {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: 3px;
   width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  height: auto;
-  min-height: 72px;
-  padding: 12px 10px;
+  min-height: 58px;
+  padding: 9px 10px;
   text-align: left;
   border: 1px solid rgba(37, 26, 17, 0.14);
   border-radius: 6px;
-  background: #fff;
+  background: white;
+  color: var(--ink);
   white-space: normal;
-  overflow: hidden;
 }
 
-.pgn-library-game strong {
-  display: block;
+.pgn-game-option:hover {
+  background: rgba(154, 69, 35, 0.06);
+}
+
+.pgn-game-option strong,
+.pgn-game-option span {
   min-width: 0;
-  max-width: 100%;
-  font-size: 13px;
-  line-height: 1.35;
   overflow-wrap: anywhere;
-  word-break: break-all;
-  white-space: normal;
+  line-height: 1.35;
 }
 
-.pgn-library-game span {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
+.pgn-game-option strong {
+  font-size: 13px;
+}
+
+.pgn-game-option span {
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  word-break: break-all;
-  white-space: normal;
-}
-
-.file-pick {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border: 1px solid rgba(37, 26, 17, 0.2);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.file-pick:hover {
-  background: rgba(37, 26, 17, 0.04);
 }
 
 .clocks {
@@ -931,7 +916,7 @@ label {
   max-width: 380px;
 }
 
-.overlay-content--library {
+.overlay-content--pgn {
   max-width: 520px;
 }
 

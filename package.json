@@ -8,9 +8,10 @@
     "server": "node server/server.js",
     "build:client": "tsc --project tsconfig.json",
     "check:client": "tsc --project tsconfig.json --noEmit",
-    "build:pgn-db": "node scripts/build-pgn-sqlite.cjs",
     "dist:mac": "npm run build:client && electron-builder --mac dmg zip",
+    "dist:mac:arm64": "npm run build:client && electron-builder --mac dmg zip --arm64",
     "dist:linux": "npm run build:client && electron-builder --linux AppImage deb tar.gz",
+    "dist:win": "npm run build:client && electron-builder --win nsis zip --x64",
     "start": "npm run build:client && electron .",
     "electron": "npm run build:client && electron ."
   },
@@ -21,35 +22,56 @@
     "asar": true,
     "files": [
       "client/**/*",
-      "package.json",
-      "!client/pgns/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "pikafish",
-        "to": "pikafish"
-      },
-      {
-        "from": "pikafish.nnue",
-        "to": "pikafish.nnue"
-      },
-      {
-        "from": "client/pgns/library.sqlite",
-        "to": "pgns/library.sqlite"
-      }
+      "package.json"
     ],
     "mac": {
       "category": "public.app-category.games",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
+      "extraResources": [
+        {
+          "from": "pikafish",
+          "to": "pikafish"
+        },
+        {
+          "from": "pikafish.nnue",
+          "to": "pikafish.nnue"
+        }
+      ],
       "target": [
         "dmg",
         "zip"
       ]
     },
+    "win": {
+      "extraResources": [
+        {
+          "from": "pikafish.exe",
+          "to": "pikafish.exe"
+        },
+        {
+          "from": "pikafish.nnue",
+          "to": "pikafish.nnue"
+        }
+      ],
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
     "linux": {
       "category": "Game",
+      "extraResources": [
+        {
+          "from": "pikafish",
+          "to": "pikafish"
+        },
+        {
+          "from": "pikafish.nnue",
+          "to": "pikafish.nnue"
+        }
+      ],
       "target": [
         "AppImage",
         "deb",

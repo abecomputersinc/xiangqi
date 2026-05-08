@@ -2,27 +2,25 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
-const { execFile, spawn } = require("node:child_process");
-const { randomBytes } = require("node:crypto");
+const os = require("node:os");
+const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "../..");
 const CLIENT_ROOT = path.resolve(__dirname, "..");
-const sqliteBin = process.env.SQLITE_BIN || "/usr/bin/sqlite3";
 
 const SERVER_URL = process.env.XIANGQI_SERVER_URL || "http://129.153.61.43:4173";
 const ENGINE_TIMEOUT_MS = Number(process.env.PIKAFISH_TIMEOUT_MS || 5000);
 const ENGINE_MOVETIME_MS = Number(process.env.PIKAFISH_MOVETIME_MS || 500);
+const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
+const engineFileName = process.platform === "win32" ? "pikafish.exe" : "pikafish";
 
 function bundledPath(...parts) {
   return app.isPackaged ? path.join(process.resourcesPath, ...parts) : path.join(ROOT, ...parts);
 }
 
-const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath("pikafish");
+const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath(engineFileName);
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
 const engineCwd = app.isPackaged ? process.resourcesPath : ROOT;
-const pgnDbPath = app.isPackaged
-  ? path.join(process.resourcesPath, "pgns", "library.sqlite")
-  : path.join(CLIENT_ROOT, "pgns", "library.sqlite");
 
 function sideFromFen(fen) {
   return fen.trim().split(/\s+/)[1] || "w";
@@ -131,37 +129,6 @@ function createWindow() {
   win.loadFile(path.join(CLIENT_ROOT, "index.html"));
 }
 
-function sqlQuote(value) {
-  return `'${String(value ?? "").replace(/'/g, "''")}'`;
-}
-
-function sqliteJson(sql) {
-  if (!fs.existsSync(pgnDbPath)) return Promise.resolve([]);
-  return new Promise((resolve, reject) => {
-    execFile(sqliteBin, ["-json", pgnDbPath, sql], { maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.trim() || error.message));
-        return;
-      }
-      try {
-        resolve(stdout.trim() ? JSON.parse(stdout) : []);
-      } catch (parseError) {
-        reject(parseError);
-      }
-    });
-  });
-}
-
-function pgnSearchWhere(args = {}) {
-  const clauses = [];
-  if (args.opening) clauses.push(`opening = ${sqlQuote(args.opening)}`);
-  const terms = String(args.query || "").trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
-  for (const term of terms) {
-    clauses.push(`lower(source || ' ' || category || ' ' || opening || ' ' || event || ' ' || date || ' ' || red || ' ' || black || ' ' || result || ' ' || title) LIKE ${sqlQuote(`%${term}%`)}`);
-  }
-  return clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-}
-
 app.whenReady().then(createWindow);
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
@@ -197,98 +164,30 @@ ipcMain.handle("engine:topmoves", async (_, args = {}) => {
   return runPikafish(String(args.fen), { multipv: count });
 });
 
-ipcMain.handle("pgn-library:index", async () => {
-  if (!fs.existsSync(pgnDbPath)) return { total: 0, openings: [] };
-  const [totalRows, openings] = await Promise.all([
-    sqliteJson("SELECT COUNT(*) AS total FROM games"),
-    sqliteJson(`
-      SELECT category, opening AS name, COUNT(*) AS count
-      FROM games
-      GROUP BY category, opening
-      ORDER BY count DESC, category, opening
-    `),
-  ]);
-  return { total: totalRows[0]?.total || 0, openings };
-});
-
-ipcMain.handle("pgn-library:search", async (_, args = {}) => {
-  if (!fs.existsSync(pgnDbPath)) return { total: 0, games: [] };
-  const limit = Math.max(1, Math.min(200, Number(args.limit) || 100));
-  const where = pgnSearchWhere(args);
-  const [totalRows, games] = await Promise.all([
-    sqliteJson(`SELECT COUNT(*) AS total FROM games ${where}`),
-    sqliteJson(`
-      SELECT
-        id,
-        source,
-        source_index AS "index",
-        category,
-        opening,
-        first_move AS firstMove,
-        title,
-        event,
-        date,
-        red,
-        black,
-        result,
-        ply_count AS plyCount
-      FROM games
-      ${where}
-      ORDER BY source, source_index
-      LIMIT ${limit}
-    `),
-  ]);
-  return { total: totalRows[0]?.total || 0, games };
-});
-
-ipcMain.handle("pgn-library:game", async (_, args = {}) => {
-  if (!args.id) throw new Error("Missing game id.");
-  const rows = await sqliteJson(`
-    SELECT
-      id,
-      source,
-      source_index AS "index",
-      category,
-      opening,
-      first_move AS firstMove,
-      title,
-      event,
-      date,
-      red,
-      black,
-      result,
-      ply_count AS plyCount,
-      pgn
-    FROM games
-    WHERE id = ${sqlQuote(args.id)}
-    LIMIT 1
-  `);
-  const row = rows[0];
-  if (!row) throw new Error("Game not found.");
-  const { pgn, ...game } = row;
-  return { game, text: pgn };
-});
-
-ipcMain.handle("pgn-library:children", async (_, args = {}) => {
-  const parentId = Math.max(1, Number(args.parentId) || 1);
-  const limit = Math.max(1, Math.min(100, Number(args.limit) || 40));
-  const children = await sqliteJson(`
-    SELECT
-      id,
-      parent_id AS parentId,
-      ply,
-      move,
-      count,
-      red_wins AS redWins,
-      black_wins AS blackWins,
-      draws,
-      sample_game_id AS sampleGameId
-    FROM nodes
-    WHERE parent_id = ${parentId}
-    ORDER BY count DESC, move
-    LIMIT ${limit}
-  `);
-  return { parentId, children };
+ipcMain.handle("pgn:read-path", async (_, args = {}) => {
+  const rawPath = String(args.path || "").trim().replace(/^['"]|['"]$/g, "");
+  if (!rawPath) throw new Error("Missing file path.");
+  const expandedPath = rawPath === "~" ? os.homedir() : rawPath.replace(/^~(?=\/|\\)/, os.homedir());
+  const filePath = path.resolve(expandedPath);
+  const stat = await fs.promises.stat(filePath);
+  if (!stat.isFile()) throw new Error("Path is not a file.");
+  const handle = await fs.promises.open(filePath, "r");
+  let bytesRead = 0;
+  let buffer;
+  try {
+    const length = Math.min(stat.size, MAX_PGN_IMPORT_BYTES);
+    buffer = Buffer.alloc(length);
+    const result = await handle.read(buffer, 0, length, 0);
+    bytesRead = result.bytesRead;
+  } finally {
+    await handle.close();
+  }
+  return {
+    name: path.basename(filePath),
+    path: filePath,
+    text: buffer.subarray(0, bytesRead).toString("utf8"),
+    truncated: stat.size > MAX_PGN_IMPORT_BYTES,
+  };
 });
 
 ipcMain.handle("config:serverUrl", () => SERVER_URL);

@@ -9,11 +9,8 @@ contextBridge.exposeInMainWorld("api", {
     bestmove: args => ipcRenderer.invoke("engine:bestmove", args),
     topmoves: args => ipcRenderer.invoke("engine:topmoves", args),
   },
-  pgnLibrary: {
-    index: () => ipcRenderer.invoke("pgn-library:index"),
-    search: args => ipcRenderer.invoke("pgn-library:search", args),
-    game: args => ipcRenderer.invoke("pgn-library:game", args),
-    children: args => ipcRenderer.invoke("pgn-library:children", args),
+  pgnFile: {
+    readPath: path => ipcRenderer.invoke("pgn:read-path", { path }),
   },
   serverUrl: () => ipcRenderer.invoke("config:serverUrl"),
 });

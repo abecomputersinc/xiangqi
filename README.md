@@ -1,10 +1,10 @@
 # xiangqi
 
-An Electron Xiangqi app with local Pikafish analysis, online match play, server-owned user levels, and a searchable PGN study library.
+An Electron Xiangqi app with local Pikafish analysis, online match play, server-owned user levels, and PGN import/replay.
 
 ## Features
 
-- Play modes: user vs AI, trainer, local human vs human, online human vs human, and PGN study.
+- Play modes: user vs AI, trainer, local human vs human, online human vs human, and PGN replay.
 - Local Pikafish engine integration through Electron IPC.
 - Legal Xiangqi move generation in the client.
 - Realtime evaluation, best-move suggestions, move-quality feedback, and score bar.
@@ -12,8 +12,6 @@ An Electron Xiangqi app with local Pikafish analysis, online match play, server-
 - Online ranked/random matchmaking and room-code matches.
 - User levels from `1-1` to `10-10`; wins add 10 points, losses subtract 10 points, and each 100 points advances one level step.
 - PGN import/export.
-- Built-in searchable DPXQ/WXF PGN study library backed by SQLite.
-- SQLite move tree for opening study: identical move prefixes share one branch.
 
 ## Project Structure
 
@@ -26,12 +24,8 @@ client/
   electron/
     main.cjs
     preload.cjs
-  pgns/
-    library.sqlite     # local data file, not committed by default
 server/
   server.js
-scripts/
-  build-pgn-sqlite.cjs
 tsconfig.json
 ```
 
@@ -40,11 +34,9 @@ The client app runs in Electron. The renderer is authored in TypeScript and comp
 ## Requirements
 
 - Node.js 20+ recommended for the app/server.
-- Node.js with `node:sqlite` support is required when rebuilding `client/pgns/library.sqlite`.
 - npm.
 - A Pikafish executable and NNUE file for AI analysis.
 - Electron dependencies installed with `npm install`.
-- The Electron PGN viewer uses the local `sqlite3` command; set `SQLITE_BIN=/path/to/sqlite3` if it is not at `/usr/bin/sqlite3`.
 
 ## Install
 
@@ -108,15 +100,32 @@ The macOS package bundles:
 
 - `pikafish`
 - `pikafish.nnue`
-- `client/pgns/library.sqlite`
 
 Build unsigned macOS DMG and ZIP artifacts:
 
 ```sh
 npm run dist:mac
+npm run dist:mac:arm64
 ```
 
 The output is written to `dist/`. Because the app is unsigned and not notarized, macOS may require right-clicking the app and choosing Open the first time.
+
+## Build Windows Client
+
+Windows builds must bundle a Windows Pikafish executable named `pikafish.exe`.
+
+Required files:
+
+```text
+pikafish.exe                  # Windows executable
+pikafish.nnue                 # downloaded from official-pikafish/Networks if missing
+```
+
+Build unsigned Windows NSIS and ZIP artifacts:
+
+```sh
+npm run dist:win
+```
 
 ## Build Linux Client
 
@@ -127,7 +136,6 @@ Required files:
 ```text
 pikafish                      # Linux ELF executable, chmod +x
 pikafish.nnue                 # downloaded from official-pikafish/Networks if missing
-client/pgns/library.sqlite
 ```
 
 Build Pikafish from source on Linux:
@@ -147,13 +155,24 @@ curl -fL https://github.com/official-pikafish/Networks/releases/download/master-
 npm run dist:linux
 ```
 
-The repository also includes a manual GitHub Actions workflow, `.github/workflows/linux-release.yml`, that builds Pikafish from `https://github.com/official-pikafish/Pikafish` on Ubuntu. Run **Linux release** from the Actions tab and provide:
+## Automated GitHub Releases
+
+The repository includes `.github/workflows/release.yml` for automatic Windows, Linux, and macOS ARM64 releases. It runs automatically when a tag matching `v*` is pushed, and can also be started manually from the Actions tab with:
 
 - release tag
 - Pikafish branch, tag, or commit to build
-- `client/pgns/library.sqlite`
+- optional NNUE download URL
+- whether to upload to the GitHub release
 
-The workflow downloads `pikafish.nnue` from the official `official-pikafish/Networks` `master-net` release by default. You can override that URL in the workflow form if you need a different network file. The workflow validates that the built `pikafish` is a Linux ELF executable, builds the Linux packages, stores them as workflow artifacts, and can upload them to the GitHub release for the tag you enter.
+Build runners:
+
+- Linux: `ubuntu-latest`
+- Windows: `windows-latest`
+- macOS ARM64: `[self-hosted, macOS, ARM64]`
+
+The macOS ARM64 runner must have Xcode Command Line Tools available so `make` can compile Pikafish.
+
+The workflow builds Pikafish from `https://github.com/official-pikafish/Pikafish`, downloads `pikafish.nnue` from the official `official-pikafish/Networks` `master-net` release by default, validates the engine binary for each platform, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release.
 
 ## Online Server
 
@@ -182,37 +201,9 @@ server/data/users.json
 
 Do not commit real production user data.
 
-## PGN Study Library
+## PGN Replay
 
-The PGN library lives under:
-
-```text
-client/pgns/library.sqlite
-```
-
-The Electron client reads this SQLite database directly. It does not load a giant JSON index into the browser.
-
-Database layout:
-
-- `games`: one row per game, including metadata and the full PGN text.
-- `nodes`: a move-prefix tree. For example, all games starting with `b2e2` share the same child node under `ROOT`; games that continue with `h9g7` share the next child under that `b2e2` node.
-
-Opening categories are based on the first move:
-
-- 炮局: 当头炮, 兵底炮局, 仕角炮局, 过宫炮局, 金钩炮局, 边炮局, 巡河炮局, 过河炮局, 龟背炮局
-- 兵局: 仙人指路, 边兵局
-- 相局: 飞相局, 边相局
-- 马局: 起马局, 边马局
-- 仕类开局: 上仕局
-- 其他类型
-
-Rebuild the SQLite library from `client/pgns/by-opening/` source files:
-
-```sh
-npm run build:pgn-db
-```
-
-The bundled library is large and is ignored by Git by default. Use Git LFS or a GitHub Release asset for `client/pgns/library.sqlite` if you want to distribute it. The old JSON index is not used by the app anymore.
+PGN mode reads user-provided game files directly. Users can paste PGN text, drag a PGN file into the import panel, or load a pasted file path. Single-game PGNs import automatically; `.pgns` and other multi-game PGN files show a selectable game list.
 
 ## Deployment
 
@@ -241,9 +232,10 @@ node --check client/app.js
 node --check client/electron/main.cjs
 node --check client/electron/preload.cjs
 node --check server/server.js
-node --check scripts/build-pgn-sqlite.cjs
 npm run dist:mac
+npm run dist:mac:arm64
 npm run dist:linux
+npm run dist:win
 ```
 
 ## Publish Notes
@@ -252,8 +244,7 @@ Before publishing to GitHub:
 
 - Do not commit private keys, tokens, or deployment credentials.
 - Do not commit production `server/data/users.json`.
-- Decide how to distribute `client/pgns/library.sqlite`. It is large and is excluded from the source repo by default.
-- macOS release artifacts can include the engine and PGN database even though those local assets are excluded from source commits.
+- Windows/Linux/macOS release artifacts include the engine and NNUE file.
 - Make sure `pikafish` and `pikafish.nnue` licensing and distribution are acceptable for your repository.
 
 ## License

@@ -92,14 +92,12 @@ const blackClockMove = qs("#blackClockMove");
 const pgnOverlay = qs("#pgnOverlay");
 const pgnOverlayClose = qs("#pgnOverlayClose");
 const pgnInput = qs("#pgnInput");
-const pgnFile = qs("#pgnFile");
+const pgnDropZone = qs("#pgnDropZone");
+const pgnPathInput = qs("#pgnPathInput");
+const pgnPathLoadBtn = qs("#pgnPathLoadBtn");
+const pgnGameList = qs("#pgnGameList");
 const pgnLoadBtn = qs("#pgnLoadBtn");
 const pgnStatus = qs("#pgnStatus");
-const pgnLibraryPanel = qs("#pgnLibraryPanel");
-const pgnSearchInput = qs("#pgnSearchInput");
-const pgnOpeningSelect = qs("#pgnOpeningSelect");
-const pgnLibraryCount = qs("#pgnLibraryCount");
-const pgnLibraryResults = qs("#pgnLibraryResults");
 const pgnNav = qs("#pgnNav");
 const pgnFirstBtn = qs("#pgnFirstBtn");
 const pgnPrevBtn = qs("#pgnPrevBtn");
@@ -2003,18 +2001,52 @@ exitBtn.addEventListener("click", () => {
 
 let pgnMoves = []; // [{ uci, raw }]
 let pgnIndex = 0;  // 0 = before first move; pgnMoves.length = end of game
-let pgnLibrary = null;
-let pgnLibraryLoadPromise = null;
-let pgnLibrarySearchRequest = 0;
+let pgnImportGames = [];
+const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
+const MAX_PGN_IMPORT_GAMES = 500;
 
 function iccsToUci(raw) {
   const match = String(raw).trim().match(/^([a-iA-I])([0-9])[-x:]?([a-iA-I])([0-9])$/);
   return match ? `${match[1]}${match[2]}${match[3]}${match[4]}`.toLowerCase() : null;
 }
 
+function splitPgnGames(text) {
+  const source = String(text || "").replace(/^\uFEFF/, "").trim();
+  if (!source) return [];
+  const starts = [...source.matchAll(/^\s*\[(?:Event|Game)\s+/gim)].map(match => match.index || 0);
+  if (!starts.length) return [source];
+  const chunks = [];
+  for (let i = 0; i < starts.length; i += 1) {
+    const start = starts[i];
+    const end = starts[i + 1] ?? source.length;
+    const chunk = source.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+    if (chunks.length >= MAX_PGN_IMPORT_GAMES) break;
+  }
+  return chunks.length ? chunks : [source];
+}
+
+function pgnHeaderValue(text, name) {
+  const match = String(text).match(new RegExp(`^\\s*\\[${name}\\s+"([^"]*)"\\]`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function describePgnGame(text, index, sourceTitle) {
+  const event = pgnHeaderValue(text, "Event") || pgnHeaderValue(text, "Game");
+  const red = pgnHeaderValue(text, "Red") || pgnHeaderValue(text, "White");
+  const black = pgnHeaderValue(text, "Black");
+  const date = pgnHeaderValue(text, "Date");
+  const result = pgnHeaderValue(text, "Result");
+  const moves = pgnParseText(text);
+  const title = event || `${sourceTitle} #${index + 1}`;
+  const players = [red, black].filter(Boolean).join(" vs ");
+  const details = [players, date, result, `${moves.length} move${moves.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+  return { text, title, details, moves };
+}
+
 function pgnParseText(text) {
   // Strip headers and comments.
-  const cleaned = text
+  const cleaned = String(text || "")
     .replace(/\[[^\]]*\]/g, " ")
     .replace(/\{[^}]*\}/g, " ")
     .replace(/;[^\n]*/g, " ")
@@ -2049,82 +2081,99 @@ function pgnLoadText(text, meta = null) {
   return true;
 }
 
-async function loadPgnLibrary() {
-  if (pgnLibrary) return pgnLibrary;
-  if (!window.api?.pgnLibrary) {
-    pgnLibraryPanel.hidden = true;
-    return null;
-  }
-  if (!pgnLibraryLoadPromise) {
-    pgnLibraryLoadPromise = window.api.pgnLibrary.index()
-      .then(index => {
-        pgnLibrary = index;
-        for (const opening of index.openings || []) {
-          const option = document.createElement("option");
-          option.value = opening.name;
-          option.textContent = `${opening.category ? `${opening.category} / ` : ""}${opening.name} (${opening.count})`;
-          pgnOpeningSelect.append(option);
-        }
-        pgnLibraryPanel.hidden = false;
-        renderPgnLibraryResults();
-        return index;
-      })
-      .catch(error => {
-        pgnLibraryCount.textContent = `Could not load library: ${error.message}`;
-        return null;
-      });
-  }
-  return pgnLibraryLoadPromise;
+function clearPgnGameList() {
+  pgnImportGames = [];
+  pgnGameList.hidden = true;
+  pgnGameList.replaceChildren();
 }
 
-async function renderPgnLibraryResults() {
-  if (!pgnLibrary?.total) {
-    pgnLibraryCount.textContent = "No library games found.";
-    pgnLibraryResults.replaceChildren();
-    return;
-  }
-  if (!window.api?.pgnLibrary?.search) return;
-  const query = pgnSearchInput.value.trim().toLowerCase();
-  const opening = pgnOpeningSelect.value;
-  const requestId = ++pgnLibrarySearchRequest;
-  pgnLibraryCount.textContent = "Searching library...";
-  let result;
-  try {
-    result = await window.api.pgnLibrary.search({ query, opening, limit: 100 });
-  } catch (error) {
-    if (requestId !== pgnLibrarySearchRequest) return;
-    pgnLibraryCount.textContent = `Search failed: ${error.message}`;
-    pgnLibraryResults.replaceChildren();
-    return;
-  }
-  if (requestId !== pgnLibrarySearchRequest) return;
-  const matched = result.games || [];
-  pgnLibraryCount.textContent = `${matched.length} shown from ${Number(result.total || 0).toLocaleString()} matching games`;
+function renderPgnGameList(sourceTitle, truncated = false) {
+  pgnGameList.hidden = false;
   const fragment = document.createDocumentFragment();
-  for (const game of matched) {
+  for (const [index, game] of pgnImportGames.entries()) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "pgn-library-game";
-    btn.dataset.id = game.id;
+    btn.className = "pgn-game-option";
+    btn.dataset.index = String(index);
     const title = document.createElement("strong");
-    title.textContent = game.title;
-    const meta = document.createElement("span");
-    meta.textContent = `${game.source} #${game.index} · ${game.opening || "其他类型"} · ${game.event} · ${game.date} · ${game.result}`;
-    btn.append(title, meta);
+    title.textContent = `${index + 1}. ${game.title}`;
+    const details = document.createElement("span");
+    details.textContent = game.details || `${game.moves.length} moves`;
+    btn.append(title, details);
     fragment.append(btn);
   }
-  pgnLibraryResults.replaceChildren(fragment);
+  pgnGameList.replaceChildren(fragment);
+  const capped = pgnImportGames.length >= MAX_PGN_IMPORT_GAMES ? ` Showing first ${MAX_PGN_IMPORT_GAMES}.` : "";
+  const clipped = truncated ? " Large file was read only at the beginning." : "";
+  pgnStatus.textContent = `Found ${pgnImportGames.length} games in ${sourceTitle}. Choose one to import.${capped}${clipped}`;
 }
 
-async function openLibraryGame(id) {
-  if (!window.api?.pgnLibrary) return;
-  pgnStatus.textContent = "Loading selected game...";
+function openPgnImportGame(index) {
+  const game = pgnImportGames[index];
+  if (!game) return;
+  pgnInput.value = game.text;
+  if (pgnLoadText(game.text, { title: game.title })) {
+    clearPgnGameList();
+    closePgnOverlay();
+  }
+}
+
+async function importPgnSource(text, title, truncated = false, { autoLoadSingle = true } = {}) {
+  clearPgnGameList();
+  const chunks = splitPgnGames(text);
+  const games = chunks
+    .map((chunk, index) => describePgnGame(chunk, index, title))
+    .filter(game => game.moves.length);
+  if (!games.length) {
+    pgnStatus.textContent = "No moves found. Expected ICCS/UCI moves like C3-C4 or h2e2.";
+    return;
+  }
+  if (games.length === 1 && autoLoadSingle) {
+    pgnInput.value = games[0].text;
+    if (pgnLoadText(games[0].text, { title: games[0].title })) {
+      if (truncated) {
+        pgnStatus.textContent = `Loaded ${games[0].title}; large file was read only at the beginning.`;
+      }
+      closePgnOverlay();
+    }
+    return;
+  }
+  pgnImportGames = games;
+  pgnInput.value = games[0].text;
+  renderPgnGameList(title, truncated);
+}
+
+async function loadPgnBrowserFile(file) {
+  if (!file) return;
+  pgnStatus.textContent = `Reading ${file.name}...`;
   try {
-    const { game, text } = await window.api.pgnLibrary.game({ id });
-    pgnInput.value = text;
-    if (pgnLoadText(text, game)) closePgnOverlay();
-  } catch (error) {
-    pgnStatus.textContent = `Could not open game: ${error.message}`;
+    const truncated = file.size > MAX_PGN_IMPORT_BYTES;
+    const text = await file.slice(0, MAX_PGN_IMPORT_BYTES).text();
+    await importPgnSource(text, file.name || "PGN file", truncated);
+  } catch (e) {
+    pgnStatus.textContent = `Could not read file: ${e.message}`;
+  }
+}
+
+async function loadPgnPath() {
+  const filePath = String(pgnPathInput.value || "").trim();
+  if (!filePath) {
+    pgnStatus.textContent = "Paste a PGN file path first.";
+    return;
+  }
+  if (!window.api?.pgnFile?.readPath) {
+    pgnStatus.textContent = "Path loading is only available in the desktop app.";
+    return;
+  }
+  pgnPathLoadBtn.disabled = true;
+  pgnStatus.textContent = "Reading PGN path...";
+  try {
+    const result = await window.api.pgnFile.readPath(filePath);
+    await importPgnSource(String(result?.text || ""), result?.name || "PGN file", Boolean(result?.truncated));
+  } catch (e) {
+    pgnStatus.textContent = `Could not read path: ${e.message}`;
+  } finally {
+    pgnPathLoadBtn.disabled = false;
   }
 }
 
@@ -2255,7 +2304,7 @@ function pgnGoto(idx) {
 function openPgnOverlay() {
   pgnOverlay.hidden = false;
   pgnStatus.textContent = "";
-  loadPgnLibrary();
+  clearPgnGameList();
   setTimeout(() => pgnInput.focus(), 30);
 }
 
@@ -2267,25 +2316,57 @@ pgnOverlayClose.addEventListener("click", closePgnOverlay);
 pgnOverlay.addEventListener("click", e => {
   if (e.target === pgnOverlay) closePgnOverlay();
 });
+pgnOverlay.addEventListener("dragover", e => {
+  e.preventDefault();
+});
+pgnOverlay.addEventListener("drop", e => {
+  if (e.target === pgnDropZone || pgnDropZone.contains(e.target as Node)) return;
+  e.preventDefault();
+  pgnDropZone.classList.remove("is-dragging");
+});
 pgnLoadBtn.addEventListener("click", () => {
-  if (pgnLoadText(pgnInput.value)) closePgnOverlay();
+  importPgnSource(pgnInput.value, "Pasted PGN");
 });
-pgnSearchInput.addEventListener("input", renderPgnLibraryResults);
-pgnOpeningSelect.addEventListener("change", renderPgnLibraryResults);
-pgnLibraryResults.addEventListener("click", e => {
-  const btn = e.target.closest(".pgn-library-game");
-  if (btn?.dataset.id) openLibraryGame(btn.dataset.id);
+pgnInput.addEventListener("paste", () => {
+  setTimeout(() => {
+    if (pgnInput.value.trim()) importPgnSource(pgnInput.value, "Pasted PGN");
+  }, 0);
 });
-pgnFile.addEventListener("change", async () => {
-  const file = pgnFile.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    pgnInput.value = text;
-    if (pgnLoadText(text)) closePgnOverlay();
-  } catch (e) {
-    pgnStatus.textContent = `Could not read file: ${e.message}`;
+pgnPathLoadBtn.addEventListener("click", loadPgnPath);
+pgnPathInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    loadPgnPath();
   }
+});
+pgnPathInput.addEventListener("paste", () => {
+  setTimeout(() => {
+    if (pgnPathInput.value.trim()) loadPgnPath();
+  }, 0);
+});
+pgnDropZone.addEventListener("dragover", e => {
+  e.preventDefault();
+  e.stopPropagation();
+  pgnDropZone.classList.add("is-dragging");
+});
+pgnDropZone.addEventListener("dragleave", () => {
+  pgnDropZone.classList.remove("is-dragging");
+});
+pgnDropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  e.stopPropagation();
+  pgnDropZone.classList.remove("is-dragging");
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) {
+    pgnStatus.textContent = "No file found in drop.";
+    return;
+  }
+  loadPgnBrowserFile(file);
+});
+pgnGameList.addEventListener("click", e => {
+  const btn = (e.target as HTMLElement | null)?.closest(".pgn-game-option") as HTMLElement | null;
+  if (!btn?.dataset.index) return;
+  openPgnImportGame(Number(btn.dataset.index));
 });
 pgnFirstBtn.addEventListener("click", () => pgnGoto(0));
 pgnPrevBtn.addEventListener("click", () => pgnGoto(pgnIndex - 1));
