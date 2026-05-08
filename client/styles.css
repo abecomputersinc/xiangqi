@@ -48,6 +48,11 @@ button:hover {
   border-color: var(--accent);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .shell {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) minmax(300px, 340px);
@@ -289,6 +294,14 @@ label {
   border: 3px solid rgba(184, 107, 22, 0.65);
 }
 
+.square.trainer-source {
+  box-shadow: 0 0 0 4px rgba(31, 111, 120, 0.42);
+}
+
+.square.trainer-target {
+  box-shadow: 0 0 0 4px rgba(184, 107, 22, 0.48);
+}
+
 .piece {
   position: absolute;
   inset: 5%;
@@ -353,6 +366,7 @@ label {
 .online,
 .clocks,
 .pgn-nav,
+.trainer-panel,
 .profile-panel {
   border: 1px solid rgba(37, 26, 17, 0.12);
   border-radius: 8px;
@@ -426,6 +440,93 @@ label {
   margin: 0;
   text-align: center;
   font-size: 13px;
+}
+
+.trainer-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.trainer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trainer-head h2 {
+  margin: 0;
+}
+
+.trainer-side-pill {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(31, 111, 120, 0.24);
+  border-radius: 999px;
+  background: rgba(31, 111, 120, 0.08);
+  color: var(--black);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trainer-prompt {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.trainer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trainer-stats div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(37, 26, 17, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.trainer-stats span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.trainer-stats strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 20px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.trainer-line {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgba(37, 26, 17, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.trainer-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trainer-actions button {
+  min-width: 0;
+  padding: 0 8px;
+  font-weight: 600;
 }
 
 #pgnInput {
@@ -1063,6 +1164,11 @@ input[type="range"] {
   }
 
   .online-match-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-actions,
+  .trainer-stats {
     grid-template-columns: 1fr;
   }
 }

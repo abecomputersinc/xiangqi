@@ -1,15 +1,17 @@
 {
   "name": "pikafish-xiangqi",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "main": "client/electron/main.cjs",
   "scripts": {
     "server": "node server/server.js",
+    "build:client": "tsc --project tsconfig.json",
+    "check:client": "tsc --project tsconfig.json --noEmit",
     "build:pgn-db": "node scripts/build-pgn-sqlite.cjs",
-    "dist:mac": "electron-builder --mac dmg zip",
-    "start": "electron .",
-    "electron": "electron ."
+    "dist:mac": "npm run build:client && electron-builder --mac dmg zip",
+    "start": "npm run build:client && electron .",
+    "electron": "npm run build:client && electron ."
   },
   "build": {
     "appId": "ca.tomliu.xiangqi",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "electron": "^29.0.0",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "typescript": "^6.0.3"
   }
 }

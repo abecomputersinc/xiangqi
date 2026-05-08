@@ -55,6 +55,34 @@
           <div class="turn-pill" id="turnPill">Red to move</div>
         </section>
 
+        <section class="trainer-panel" id="trainerPanel" hidden>
+          <div class="trainer-head">
+            <h2>Trainer</h2>
+            <span id="trainerSide" class="trainer-side-pill">Red trainer</span>
+          </div>
+          <p id="trainerPrompt" class="trainer-prompt">Find the best move.</p>
+          <div class="trainer-stats">
+            <div>
+              <span>Solved</span>
+              <strong id="trainerSolved">0</strong>
+            </div>
+            <div>
+              <span>Streak</span>
+              <strong id="trainerStreak">0</strong>
+            </div>
+            <div>
+              <span>Attempts</span>
+              <strong id="trainerAttempts">0</strong>
+            </div>
+          </div>
+          <div id="trainerLine" class="trainer-line">Preparing position.</div>
+          <div class="trainer-actions">
+            <button id="trainerHintBtn" type="button">Hint</button>
+            <button id="trainerRevealBtn" type="button">Reveal</button>
+            <button id="trainerRestartBtn" type="button">Restart</button>
+          </div>
+        </section>
+
         <section class="clocks" id="clocks">
           <h2>Clock</h2>
           <div class="clock-row" id="clockRowRed">
@@ -76,6 +104,7 @@
           <label>
             <select id="modeSelect">
               <option value="ai">User vs AI</option>
+              <option value="trainer">Trainer</option>
               <option value="human">Human vs Human (local)</option>
               <option value="online">User vs User (online)</option>
               <option value="pgn">PGN viewer</option>
@@ -143,6 +172,10 @@
             <button type="button" class="startup-option" data-mode="ai">
               <strong>Vs AI</strong>
               <span>Play against Pikafish on this device</span>
+            </button>
+            <button type="button" class="startup-option" data-mode="trainer">
+              <strong>Trainer</strong>
+              <span>Find best moves with hints and scoring</span>
             </button>
             <button type="button" class="startup-option" data-mode="human">
               <strong>Vs Human (local)</strong>

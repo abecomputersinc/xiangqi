@@ -4,7 +4,7 @@ An Electron Xiangqi app with local Pikafish analysis, online match play, server-
 
 ## Features
 
-- Play modes: user vs AI, local human vs human, online human vs human, and PGN study.
+- Play modes: user vs AI, trainer, local human vs human, online human vs human, and PGN study.
 - Local Pikafish engine integration through Electron IPC.
 - Legal Xiangqi move generation in the client.
 - Realtime evaluation, best-move suggestions, move-quality feedback, and score bar.
@@ -20,7 +20,8 @@ An Electron Xiangqi app with local Pikafish analysis, online match play, server-
 ```text
 client/
   index.html
-  app.js
+  app.ts             # TypeScript renderer source
+  app.js             # generated renderer bundle loaded by index.html
   styles.css
   electron/
     main.cjs
@@ -31,9 +32,10 @@ server/
   server.js
 scripts/
   build-pgn-sqlite.cjs
+tsconfig.json
 ```
 
-The client app runs in Electron. The server is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
+The client app runs in Electron. The renderer is authored in TypeScript and compiled to `client/app.js` before app startup/build. The server is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
 
 ## Requirements
 
@@ -78,6 +80,8 @@ Start the Electron client:
 ```sh
 npm start
 ```
+
+`npm start` compiles `client/app.ts` first, then opens Electron.
 
 By default the Electron app points to:
 
@@ -194,6 +198,8 @@ Open TCP port `4173` in both the VM firewall and cloud security rules.
 ## Useful Commands
 
 ```sh
+npm run check:client
+npm run build:client
 node --check client/app.js
 node --check client/electron/main.cjs
 node --check client/electron/preload.cjs
