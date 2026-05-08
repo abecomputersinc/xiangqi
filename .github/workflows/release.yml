@@ -85,7 +85,17 @@ jobs:
 
       - name: Download NNUE
         shell: bash
-        run: curl -fL "${NNUE_URL}" -o pikafish.nnue
+        run: |
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            --connect-timeout 30 \
+            --max-time 300 \
+            "${NNUE_URL}" \
+            -o pikafish.nnue
 
       - name: Validate engine assets
         shell: bash
@@ -183,7 +193,17 @@ jobs:
 
       - name: Download NNUE
         shell: pwsh
-        run: Invoke-WebRequest -Uri $env:NNUE_URL -OutFile "pikafish.nnue"
+        run: |
+          $ProgressPreference = "SilentlyContinue"
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $env:NNUE_URL -OutFile "pikafish.nnue" -MaximumRedirection 5 -TimeoutSec 300
+              break
+            } catch {
+              if ($attempt -eq 5) { throw }
+              Start-Sleep -Seconds (5 * $attempt)
+            }
+          }
 
       - name: Validate engine assets
         shell: pwsh
@@ -268,7 +288,17 @@ jobs:
 
       - name: Download NNUE
         shell: bash
-        run: curl -fL "${NNUE_URL}" -o pikafish.nnue
+        run: |
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            --connect-timeout 30 \
+            --max-time 300 \
+            "${NNUE_URL}" \
+            -o pikafish.nnue
 
       - name: Validate engine assets
         shell: bash
