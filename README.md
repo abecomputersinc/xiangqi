@@ -1,17 +1,25 @@
 # xiangqi
 
-An Electron Xiangqi app with local Pikafish analysis, online match play, server-owned user levels, and PGN import/replay.
+xiangqi is a desktop Chinese chess app for playing, training, and reviewing games. It combines a clean board, local Pikafish engine analysis, online matches, player levels, and PGN tools in one app.
 
-## Features
+![xiangqi trainer mode showing the board, realtime score, and move analysis](docs/xiangqi-trainer.png)
 
-- Play modes: user vs AI, trainer, local human vs human, online human vs human, and PGN replay.
-- Local Pikafish engine integration through Electron IPC.
-- Legal Xiangqi move generation in the client.
-- Realtime evaluation, best-move suggestions, move-quality feedback, and score bar.
-- Server login/sign up for online play.
-- Online ranked/random matchmaking and room-code matches.
-- User levels from `1-1` to `10-10`; wins add 10 points, losses subtract 10 points, and each 100 points advances one level step.
-- PGN import/export.
+Use it when you want to:
+
+- Play a full Xiangqi game against Pikafish, a local opponent, or another player online.
+- Practice with Trainer mode: find the best move, ask for a hint, reveal the answer, restart the position, and track solved positions, attempts, and streaks.
+- Study positions with realtime evaluation, best-move suggestions, move-quality feedback, and a visual score bar.
+- Sign in for online play, ranked/random matchmaking, room-code matches, and persistent levels from `1-1` to `10-10`.
+- Import and replay PGN games, export your own games, or copy the current FEN for sharing.
+- Run engine analysis locally through bundled Pikafish and NNUE files.
+
+## Main Functions
+
+- **Play**: choose AI games, local human vs human, online human vs human, ranked/random matchmaking, or room-code matches.
+- **Train**: solve best-move challenges with Hint, Reveal, Restart, solved count, streak, and attempt tracking.
+- **Analyze**: see live score, recommended moves, and move-quality feedback while you play.
+- **Review**: import PGN, step through saved games, and export finished games.
+- **Account and levels**: log in or sign up for online play; ranked results update persistent level points.
 
 ## Project Structure
 
