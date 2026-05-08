@@ -13,8 +13,9 @@ on:
         default: "master"
         type: string
       nnue_url:
-        description: "Direct URL for pikafish.nnue"
-        required: true
+        description: "Direct URL for pikafish.nnue; leave default for official master-net"
+        required: false
+        default: "https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue"
         type: string
       pgn_library_url:
         description: "Direct URL for client/pgns/library.sqlite"
@@ -74,11 +75,15 @@ jobs:
           fi
           install -m 755 "${engine_path}" pikafish
 
-      - name: Download large runtime assets
+      - name: Download NNUE and PGN library
         run: |
           set -euo pipefail
           mkdir -p client/pgns
-          curl -fL "${{ inputs.nnue_url }}" -o pikafish.nnue
+          nnue_url="${{ inputs.nnue_url }}"
+          if [ -z "${nnue_url}" ]; then
+            nnue_url="https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue"
+          fi
+          curl -fL "${nnue_url}" -o pikafish.nnue
           curl -fL "${{ inputs.pgn_library_url }}" -o client/pgns/library.sqlite
 
       - name: Validate Linux engine

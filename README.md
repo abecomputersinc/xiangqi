@@ -126,7 +126,7 @@ Required files:
 
 ```text
 pikafish                      # Linux ELF executable, chmod +x
-pikafish.nnue
+pikafish.nnue                 # downloaded from official-pikafish/Networks if missing
 client/pgns/library.sqlite
 ```
 
@@ -143,6 +143,7 @@ Then build Linux AppImage, DEB, and tar.gz artifacts:
 
 ```sh
 npm ci
+curl -fL https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue -o pikafish.nnue
 npm run dist:linux
 ```
 
@@ -150,10 +151,9 @@ The repository also includes a manual GitHub Actions workflow, `.github/workflow
 
 - release tag
 - Pikafish branch, tag, or commit to build
-- `pikafish.nnue`
 - `client/pgns/library.sqlite`
 
-The workflow validates that the built `pikafish` is a Linux ELF executable, builds the Linux packages, stores them as workflow artifacts, and can upload them to the GitHub release for the tag you enter.
+The workflow downloads `pikafish.nnue` from the official `official-pikafish/Networks` `master-net` release by default. You can override that URL in the workflow form if you need a different network file. The workflow validates that the built `pikafish` is a Linux ELF executable, builds the Linux packages, stores them as workflow artifacts, and can upload them to the GitHub release for the tag you enter.
 
 ## Online Server
 
