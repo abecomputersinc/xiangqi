@@ -118,6 +118,43 @@ npm run dist:mac
 
 The output is written to `dist/`. Because the app is unsigned and not notarized, macOS may require right-clicking the app and choosing Open the first time.
 
+## Build Linux Client
+
+Linux builds must bundle a Linux Pikafish executable. The checked-out local `pikafish` file may be a macOS binary, so replace it or build it from source before packaging on Linux.
+
+Required files:
+
+```text
+pikafish                      # Linux ELF executable, chmod +x
+pikafish.nnue
+client/pgns/library.sqlite
+```
+
+Build Pikafish from source on Linux:
+
+```sh
+git clone https://github.com/official-pikafish/Pikafish.git /tmp/pikafish
+make -C /tmp/pikafish/src -j"$(nproc)" profile-build
+install -m 755 /tmp/pikafish/src/pikafish ./pikafish
+file pikafish                 # should include "ELF"
+```
+
+Then build Linux AppImage, DEB, and tar.gz artifacts:
+
+```sh
+npm ci
+npm run dist:linux
+```
+
+The repository also includes a manual GitHub Actions workflow, `.github/workflows/linux-release.yml`, that builds Pikafish from `https://github.com/official-pikafish/Pikafish` on Ubuntu. Run **Linux release** from the Actions tab and provide:
+
+- release tag
+- Pikafish branch, tag, or commit to build
+- `pikafish.nnue`
+- `client/pgns/library.sqlite`
+
+The workflow validates that the built `pikafish` is a Linux ELF executable, builds the Linux packages, stores them as workflow artifacts, and can upload them to the GitHub release for the tag you enter.
+
 ## Online Server
 
 The server exposes:
@@ -206,6 +243,7 @@ node --check client/electron/preload.cjs
 node --check server/server.js
 node --check scripts/build-pgn-sqlite.cjs
 npm run dist:mac
+npm run dist:linux
 ```
 
 ## Publish Notes
