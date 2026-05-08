@@ -1,6 +1,11 @@
 {
   "name": "xiangqi",
   "version": "1.0.4",
+  "description": "A desktop Xiangqi game.",
+  "author": {
+    "name": "Hangcheng Liu",
+    "email": "mail@tomliu.ca"
+  },
   "private": true,
   "type": "module",
   "main": "client/electron/main.cjs",
@@ -20,13 +25,14 @@
     "productName": "xiangqi",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
+    "afterPack": "scripts/clean-mac-xattrs.cjs",
     "files": [
       "client/**/*",
       "package.json"
     ],
     "mac": {
       "category": "public.app-category.games",
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extraResources": [
