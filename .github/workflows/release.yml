@@ -35,9 +35,37 @@ env:
   NNUE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.nnue_url || 'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue' }}
 
 jobs:
+  prepare-nnue:
+    name: Prepare NNUE
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download NNUE
+        shell: bash
+        run: |
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            --connect-timeout 30 \
+            --max-time 300 \
+            "${NNUE_URL}" \
+            -o pikafish.nnue
+
+      - name: Upload NNUE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          if-no-files-found: error
+          retention-days: 1
+          path: pikafish.nnue
+
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    needs: prepare-nnue
 
     steps:
       - name: Check out release tag
@@ -83,19 +111,11 @@ jobs:
           fi
           install -m 755 "${engine_path}" pikafish
 
-      - name: Download NNUE
-        shell: bash
-        run: |
-          curl \
-            --fail \
-            --location \
-            --retry 5 \
-            --retry-delay 5 \
-            --retry-all-errors \
-            --connect-timeout 30 \
-            --max-time 300 \
-            "${NNUE_URL}" \
-            -o pikafish.nnue
+      - name: Restore NNUE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          path: .
 
       - name: Validate engine assets
         shell: bash
@@ -143,6 +163,7 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    needs: prepare-nnue
 
     steps:
       - name: Check out release tag
@@ -191,19 +212,11 @@ jobs:
           fi
           cp "${engine_path}" "${workspace}/pikafish.exe"
 
-      - name: Download NNUE
-        shell: pwsh
-        run: |
-          $ProgressPreference = "SilentlyContinue"
-          for ($attempt = 1; $attempt -le 5; $attempt++) {
-            try {
-              Invoke-WebRequest -Uri $env:NNUE_URL -OutFile "pikafish.nnue" -MaximumRedirection 5 -TimeoutSec 300
-              break
-            } catch {
-              if ($attempt -eq 5) { throw }
-              Start-Sleep -Seconds (5 * $attempt)
-            }
-          }
+      - name: Restore NNUE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          path: .
 
       - name: Validate engine assets
         shell: pwsh
@@ -247,6 +260,7 @@ jobs:
   build-macos-arm64:
     name: Build macOS ARM64
     runs-on: [self-hosted, macOS, ARM64]
+    needs: prepare-nnue
 
     steps:
       - name: Check out release tag
@@ -286,19 +300,11 @@ jobs:
           fi
           install -m 755 "${engine_path}" pikafish
 
-      - name: Download NNUE
-        shell: bash
-        run: |
-          curl \
-            --fail \
-            --location \
-            --retry 5 \
-            --retry-delay 5 \
-            --retry-all-errors \
-            --connect-timeout 30 \
-            --max-time 300 \
-            "${NNUE_URL}" \
-            -o pikafish.nnue
+      - name: Restore NNUE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          path: .
 
       - name: Validate engine assets
         shell: bash
@@ -389,6 +395,7 @@ jobs:
       - name: Download workflow artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: xiangqi-*-${{ env.RELEASE_TAG }}
           path: release-assets
           merge-multiple: true
 
