@@ -281,7 +281,20 @@ jobs:
           }
 
       - name: Build packages
-        run: npm run dist:mac:arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_dir="/private/tmp/xiangqi-macos-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf "${build_dir}"
+          mkdir -p "${build_dir}"
+          git archive --format=tar HEAD | tar -C "${build_dir}" -xf -
+          install -m 755 pikafish "${build_dir}/pikafish"
+          cp pikafish.nnue "${build_dir}/pikafish.nnue"
+          npm ci --prefix "${build_dir}"
+          npm --prefix "${build_dir}" run dist:mac:arm64
+          rm -rf dist
+          mkdir -p dist
+          cp "${build_dir}"/dist/*.dmg "${build_dir}"/dist/*.zip dist/
 
       - name: Write checksums
         shell: bash
