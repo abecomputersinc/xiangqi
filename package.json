@@ -7,6 +7,7 @@
     "email": "mail@tomliu.ca"
   },
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "main": "client/electron/main.cjs",
   "scripts": {

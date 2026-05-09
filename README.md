@@ -252,9 +252,18 @@ Before publishing to GitHub:
 
 - Do not commit private keys, tokens, or deployment credentials.
 - Do not commit production `server/data/users.json`.
-- Windows/Linux/macOS release artifacts include the engine and NNUE file.
-- Make sure `pikafish` and `pikafish.nnue` licensing and distribution are acceptable for your repository.
+- Windows/Linux/macOS release artifacts include third-party Pikafish engine and NNUE files.
+- Release artifacts are not licensed as a single all-GPL package; bundled third-party components keep their own license terms.
+- The bundled `pikafish.nnue` weights are not for commercial use without permission from the rightsholder.
+- If you publish release artifacts, include the applicable third-party notices and source-code pointers for redistributed GPL components.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+xiangqi source code is licensed under the GNU General Public License version 3. See [LICENSE](LICENSE).
+
+Release artifacts can include third-party components with separate license terms:
+
+- `pikafish` / `pikafish.exe`: Pikafish engine, licensed separately under GPLv3 by the Pikafish project. When redistributing it, include the GPLv3 license and a source-code pointer for the exact engine build you ship.
+- `pikafish.nnue`: Pikafish NNUE weights from the official Pikafish Networks release. The bundled weights are not for commercial use without permission from the rightsholder.
+
+Do not treat a packaged release that includes `pikafish.nnue` as approved for business or commercial use unless you have the required permission for those NNUE weights.

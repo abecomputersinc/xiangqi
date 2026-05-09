@@ -122,6 +122,7 @@ const startupSideOptions = qsa(".startup-side-option");
 const profilePanel = qs(".profile-panel");
 const profileNameEl = qs("#profileName");
 const profileLevelEl = qs("#profileLevel");
+const languageSelect = qs("#languageSelect");
 const loginBtn = qs("#loginBtn");
 const loginOverlay = qs("#loginOverlay");
 const loginCloseBtn = qs("#loginCloseBtn");
@@ -130,6 +131,426 @@ const loginName = qs("#loginName");
 const loginPassword = qs("#loginPassword");
 const loginStatus = qs("#loginStatus");
 const signupBtn = qs("#signupBtn");
+
+const I18N = {
+  en: {
+    appLang: "en",
+    guest: "Guest",
+    loginRequired: "Login required",
+    beginner: "Beginner",
+    highest: "Highest",
+    points: "pts",
+    logout: "Logout",
+    login: "Login",
+    signup: "Sign up",
+    player: "Player",
+    level: "Level",
+    language: "Language",
+    pgnReplay: "PGN replay",
+    importAnotherPgn: "Import another PGN",
+    loadingEngine: "Loading engine...",
+    redToMove: "Red to move",
+    blackToMove: "Black to move",
+    trainer: "Trainer",
+    redTrainer: "Red trainer",
+    blackTrainer: "Black trainer",
+    findBestMove: "Find the best move.",
+    solved: "Solved",
+    streak: "Streak",
+    attempts: "Attempts",
+    preparingPosition: "Preparing position.",
+    hint: "Hint",
+    reveal: "Reveal",
+    restart: "Restart",
+    clock: "Clock",
+    red: "Red",
+    black: "Black",
+    userVsAi: "User vs AI",
+    humanLocal: "Human vs Human (local)",
+    userOnline: "User vs User (online)",
+    pgnViewer: "PGN viewer",
+    youPlay: "You play",
+    engineDepth: "Engine depth",
+    newGame: "New Game",
+    realtimeScore: "Realtime score",
+    moveAnalysis: "Move analysis",
+    moveToSeeScore: "Make a move to see Pikafish's score.",
+    moves: "Moves",
+    undo: "Undo",
+    downloadPgn: "Download PGN",
+    exit: "Exit",
+    chooseMode: "Choose a mode",
+    chooseModeHint: "Pick how you want to play.",
+    vsAi: "Vs AI",
+    vsAiHint: "Play against Pikafish on this device",
+    trainerHintMode: "Find best moves with hints and scoring",
+    vsHumanLocal: "Vs Human (local)",
+    vsHumanLocalHint: "Two players on the same screen",
+    vsHumanOnline: "Vs Human (online)",
+    vsHumanOnlineHint: "Match up over the internet",
+    pgnViewerHint: "Import a game and step through it",
+    chooseSide: "Choose your side",
+    redFirst: "Red moves first.",
+    playRed: "Play Red",
+    moveFirst: "Move first",
+    playBlack: "Play Black",
+    pikafishFirst: "Pikafish moves first",
+    back: "Back",
+    loginHint: "Login with an existing account or create a new one.",
+    username: "Username",
+    yourName: "Your name",
+    password: "Password",
+    levelEarned: "Level is earned in online matches.",
+    importPgn: "Import PGN",
+    pgnImportHint: "Paste PGN text, drag a PGN file here, or load from a file path.",
+    dropPgn: "Drop PGN file here",
+    loadPath: "Load path",
+    loadPgn: "Load PGN",
+    onlinePlay: "Online play",
+    account: "Account",
+    loginFirst: "Login first",
+    createRoom: "Create room",
+    randomMatch: "Random match",
+    rankMatch: "Rank match",
+    roomCode: "Room code",
+    join: "Join",
+    spectate: "Spectate",
+    room: "Room",
+    copy: "copy",
+    copied: "copied",
+    leave: "Leave",
+    rematch: "Rematch",
+    resign: "Resign",
+    start: "Start",
+    previous: "Previous",
+    next: "Next",
+    end: "End",
+    close: "Close",
+    copyFen: "Copy FEN",
+    clickToCopy: "Click to copy",
+    startPosition: "Start position",
+    moveCounter: (index, total) => `Move ${index} / ${total}`,
+    lastMove: raw => `Last: ${raw}`,
+    colorToMove: color => `${color === "red" ? "Red" : "Black"} to move`,
+    flagged: (loser, winner) => `${colorLabel(loser)} flagged. ${colorLabel(winner)} wins on time.`,
+    winsBy: (winner, reason) => `${colorLabel(winner)} wins by ${reason}!`,
+    drawBy: reason => `Draw by ${reason}.`,
+    replyPlayed: color => `${colorLabel(color)} reply is being played.`,
+    preparingColorPosition: color => `Preparing ${colorLabel(color)} position.`,
+    trainerUnavailablePosition: "Trainer is unavailable for this position.",
+    findColorBest: color => `Find ${colorLabel(color)}'s best move.`,
+    trainerUnavailable: "Trainer unavailable.",
+    pikafishSide: color => `${colorLabel(color)} is Pikafish's side.`,
+    hintPieceFrom: (piece, square) => `Hint: ${piece} from ${square}.`,
+    positionReady: "Position ready.",
+    bestLines: lines => `Best lines:\n${lines}`,
+    noBestLine: "No best line available.",
+    preparingTrainer: "Preparing trainer position...",
+    trainerPreparing: "Trainer is preparing the position.",
+    noTrainerMoveFound: "No trainer move found.",
+    trainerReady: "Trainer ready",
+    trainerCouldNotFind: "Trainer could not find a move.",
+    noTrainerMove: "No trainer move available.",
+    trainerUnavailableError: error => `Trainer unavailable: ${error}`,
+    choosingTrainerReply: "Pikafish is choosing a trainer reply...",
+    noLegalReply: "Pikafish returned no legal reply.",
+    trainerStopped: error => `Trainer stopped: ${error}`,
+    stillPreparing: "Position is still preparing.",
+    choiceTry: (rank, score, loss) => `Choice #${rank} (${score}${loss}). Try to stay within 1.00.`,
+    lostTry: loss => `Lost ${loss}. Try to stay within 1.00.`,
+    lostSuffix: loss => `, lost ${loss}`,
+    outsideTopLines: "Legal, but outside Pikafish's top lines.",
+    tryAgain: "Try again.",
+    bestMove: label => `Best move: ${label}.`,
+    goodMove: (label, loss) => `Good move: ${label} (lost ${loss}).`,
+    goodMoveLoss: loss => `Good move: lost ${loss}.`,
+    needsWork: loss => `Needs work: lost ${loss}.`,
+    recommendations: lines => `Recommendations:\n${lines}`,
+    engineElectron: "Open in the Electron app for Pikafish analysis.",
+    pikafishAnalyzing: "Pikafish is analyzing...",
+    pikafishReady: "Pikafish ready",
+    pikafishMissing: "Pikafish or NNUE file missing",
+    engineUnavailable: error => `Engine unavailable: ${error}`,
+    choosingMove: "Pikafish is choosing a move...",
+    noLegalMove: "Pikafish returned no legal move.",
+    engineOnlyElectron: "Engine is only available in the Electron client.",
+    unknownEnginePath: path => `Unknown engine path: ${path}`,
+    moveNotSent: error => `Move not sent: ${error}`,
+    onlineNewGame: "Use the room controls to start a new online game.",
+    undoOnline: "Undo isn't available in online play.",
+    undoTrainer: "Undo is disabled during scored training.",
+    outOfSync: "Got an out-of-sync move from opponent. Reload to resync.",
+    requestFailed: status => `Request failed (${status})`,
+    creatingAccount: "Creating account...",
+    loggingIn: "Logging in...",
+    loginBeforeOnline: "Login before playing online.",
+    creatingRoom: "Creating room...",
+    validRoomCode: "Enter a valid room code.",
+    joiningSpectator: "Joining as spectator...",
+    joiningRoom: "Joining room...",
+    searchingOpponent: "Searching for an opponent...",
+    waitingShareCode: code => `Waiting for an opponent. Share code ${code} to invite a friend.`,
+    searchingNear: level => `Searching near ${level}...`,
+    waitingRanked: code => `Waiting for a ranked opponent near your level. Room ${code}.`,
+    connectionIssue: "Connection issue - trying to reconnect...",
+    outcomeDraw: reason => `draw (${reason})`,
+    outcomeWin: (winner, reason) => `${colorLabel(winner)} wins by ${reason}`,
+    confirmResign: "Resign the game?",
+    rematchRequested: "Rematch requested. Waiting for opponent...",
+    spectators: list => `Spectators: ${list}`,
+    waitingOpponentShare: code => `Waiting for an opponent... share code ${code}.`,
+    yourTurn: "Your turn.",
+    opponentTurn: "Opponent's turn.",
+    rankedStatus: status => `Rank match · ${status}`,
+    rematchVotes: (votes, total) => `Rematch (${votes}/${total})`,
+    waiting: "Waiting...",
+    offline: "offline",
+    roomCopied: "Room code copied.",
+    noMovesFound: "No moves found. Expected ICCS/UCI moves like C3-C4 or h2e2.",
+    loadedGame: (title, moves) => `Loaded ${title} (${moves} moves).`,
+    loadedMoves: moves => `Loaded ${moves} move(s).`,
+    foundGames: (count, source, capped, clipped) => `Found ${count} games in ${source}. Choose one to import.${capped}${clipped}`,
+    showingFirst: max => ` Showing first ${max}.`,
+    largeFileBeginning: " Large file was read only at the beginning.",
+    readFile: name => `Reading ${name}...`,
+    couldNotReadFile: error => `Could not read file: ${error}`,
+    pastePath: "Paste a PGN file path first.",
+    pathDesktopOnly: "Path loading is only available in the desktop app.",
+    readingPath: "Reading PGN path...",
+    couldNotReadPath: error => `Could not read path: ${error}`,
+    pastedPgn: "Pasted PGN",
+    pgnFile: "PGN file",
+    loadedLarge: title => `Loaded ${title}; large file was read only at the beginning.`,
+    noFileDrop: "No file found in drop.",
+    noMoveAnalyze: "Start position - no move to analyze yet.",
+    analyzing: "Analyzing...",
+    noAnalysis: "No engine analysis available.",
+    analysisFailed: error => `Analysis failed: ${error || "unknown"}`,
+    movesCount: count => `${count} move${count === 1 ? "" : "s"}`,
+    piece: { K: "King", A: "Advisor", B: "Elephant", N: "Horse", R: "Rook", C: "Cannon", P: "Pawn", k: "King", a: "Advisor", b: "Elephant", n: "Horse", r: "Rook", c: "Cannon", p: "Pawn" },
+  },
+  zh: {
+    appLang: "zh-Hans",
+    guest: "游客",
+    loginRequired: "需要登录",
+    beginner: "入门",
+    highest: "最高",
+    points: "分",
+    logout: "退出登录",
+    login: "登录",
+    signup: "注册",
+    player: "玩家",
+    level: "等级",
+    language: "语言",
+    pgnReplay: "PGN 回放",
+    importAnotherPgn: "导入另一个 PGN",
+    loadingEngine: "正在加载引擎...",
+    redToMove: "红方走棋",
+    blackToMove: "黑方走棋",
+    trainer: "训练",
+    redTrainer: "红方训练",
+    blackTrainer: "黑方训练",
+    findBestMove: "找出最佳走法。",
+    solved: "已解",
+    streak: "连胜",
+    attempts: "尝试",
+    preparingPosition: "正在准备局面。",
+    hint: "提示",
+    reveal: "揭示",
+    restart: "重开",
+    clock: "棋钟",
+    red: "红方",
+    black: "黑方",
+    userVsAi: "人机对弈",
+    humanLocal: "本地双人",
+    userOnline: "在线对弈",
+    pgnViewer: "PGN 查看器",
+    youPlay: "执棋方",
+    engineDepth: "引擎深度",
+    newGame: "新棋局",
+    realtimeScore: "实时评分",
+    moveAnalysis: "走法分析",
+    moveToSeeScore: "走一步即可查看 Pikafish 评分。",
+    moves: "棋谱",
+    undo: "悔棋",
+    downloadPgn: "下载 PGN",
+    exit: "退出",
+    chooseMode: "选择模式",
+    chooseModeHint: "选择你想玩的方式。",
+    vsAi: "对战 AI",
+    vsAiHint: "在本机与 Pikafish 对弈",
+    trainerHintMode: "用提示和评分练习最佳走法",
+    vsHumanLocal: "本地双人",
+    vsHumanLocalHint: "两名玩家共用同一屏幕",
+    vsHumanOnline: "在线双人",
+    vsHumanOnlineHint: "通过互联网匹配对手",
+    pgnViewerHint: "导入棋局并逐步回放",
+    chooseSide: "选择执棋方",
+    redFirst: "红方先行。",
+    playRed: "执红",
+    moveFirst: "先行",
+    playBlack: "执黑",
+    pikafishFirst: "Pikafish 先走",
+    back: "返回",
+    loginHint: "使用已有账号登录，或创建新账号。",
+    username: "用户名",
+    yourName: "你的名字",
+    password: "密码",
+    levelEarned: "等级通过在线对局获得。",
+    importPgn: "导入 PGN",
+    pgnImportHint: "粘贴 PGN 文本、拖入 PGN 文件，或从文件路径加载。",
+    dropPgn: "将 PGN 文件拖到这里",
+    loadPath: "加载路径",
+    loadPgn: "加载 PGN",
+    onlinePlay: "在线对弈",
+    account: "账号",
+    loginFirst: "请先登录",
+    createRoom: "创建房间",
+    randomMatch: "随机匹配",
+    rankMatch: "排位赛",
+    roomCode: "房间码",
+    join: "加入",
+    spectate: "观战",
+    room: "房间",
+    copy: "复制",
+    copied: "已复制",
+    leave: "离开",
+    rematch: "再来一局",
+    resign: "认输",
+    start: "开始",
+    previous: "上一步",
+    next: "下一步",
+    end: "末尾",
+    close: "关闭",
+    copyFen: "复制 FEN",
+    clickToCopy: "点击复制",
+    startPosition: "初始局面",
+    moveCounter: (index, total) => `第 ${index} 步 / 共 ${total} 步`,
+    lastMove: raw => `上一手：${raw}`,
+    colorToMove: color => `${color === "red" ? "红方" : "黑方"}走棋`,
+    flagged: (loser, winner) => `${colorLabel(loser)}超时。${colorLabel(winner)}超时胜。`,
+    winsBy: (winner, reason) => `${colorLabel(winner)}因 ${reasonText(reason)} 获胜！`,
+    drawBy: reason => `因 ${reasonText(reason)} 和棋。`,
+    replyPlayed: color => `${colorLabel(color)}正在应招。`,
+    preparingColorPosition: color => `正在准备${colorLabel(color)}局面。`,
+    trainerUnavailablePosition: "此局面暂不能训练。",
+    findColorBest: color => `找出${colorLabel(color)}最佳走法。`,
+    trainerUnavailable: "训练不可用。",
+    pikafishSide: color => `${colorLabel(color)}由 Pikafish 行棋。`,
+    hintPieceFrom: (piece, square) => `提示：${piece} 从 ${square} 出发。`,
+    positionReady: "局面已准备好。",
+    bestLines: lines => `最佳路线：\n${lines}`,
+    noBestLine: "暂无最佳路线。",
+    preparingTrainer: "正在准备训练局面...",
+    trainerPreparing: "训练局面正在准备。",
+    noTrainerMoveFound: "未找到训练走法。",
+    trainerReady: "训练已就绪",
+    trainerCouldNotFind: "训练未能找到走法。",
+    noTrainerMove: "暂无训练走法。",
+    trainerUnavailableError: error => `训练不可用：${error}`,
+    choosingTrainerReply: "Pikafish 正在选择训练应招...",
+    noLegalReply: "Pikafish 没有返回合法应招。",
+    trainerStopped: error => `训练已停止：${error}`,
+    stillPreparing: "局面仍在准备中。",
+    choiceTry: (rank, score, loss) => `第 ${rank} 选择（${score}${loss}）。尽量保持在 1.00 以内。`,
+    lostTry: loss => `损失 ${loss}。尽量保持在 1.00 以内。`,
+    lostSuffix: loss => `，损失 ${loss}`,
+    outsideTopLines: "合法，但不在 Pikafish 主要推荐路线中。",
+    tryAgain: "再试一次。",
+    bestMove: label => `最佳走法：${label}。`,
+    goodMove: (label, loss) => `好棋：${label}（损失 ${loss}）。`,
+    goodMoveLoss: loss => `好棋：损失 ${loss}。`,
+    needsWork: loss => `仍需改进：损失 ${loss}。`,
+    recommendations: lines => `推荐走法：\n${lines}`,
+    engineElectron: "请在 Electron 桌面应用中使用 Pikafish 分析。",
+    pikafishAnalyzing: "Pikafish 正在分析...",
+    pikafishReady: "Pikafish 已就绪",
+    pikafishMissing: "缺少 Pikafish 或 NNUE 文件",
+    engineUnavailable: error => `引擎不可用：${error}`,
+    choosingMove: "Pikafish 正在选择走法...",
+    noLegalMove: "Pikafish 没有返回合法走法。",
+    engineOnlyElectron: "引擎只在 Electron 客户端中可用。",
+    unknownEnginePath: path => `未知引擎路径：${path}`,
+    moveNotSent: error => `走法未发送：${error}`,
+    onlineNewGame: "请使用房间控件开始新的在线对局。",
+    undoOnline: "在线对局不能悔棋。",
+    undoTrainer: "评分训练中不能悔棋。",
+    outOfSync: "收到不同步的对手走法。请重新加载以同步。",
+    requestFailed: status => `请求失败（${status}）`,
+    creatingAccount: "正在创建账号...",
+    loggingIn: "正在登录...",
+    loginBeforeOnline: "在线对局前请先登录。",
+    creatingRoom: "正在创建房间...",
+    validRoomCode: "请输入有效房间码。",
+    joiningSpectator: "正在以观战者身份加入...",
+    joiningRoom: "正在加入房间...",
+    searchingOpponent: "正在寻找对手...",
+    waitingShareCode: code => `正在等待对手。分享房间码 ${code} 邀请好友。`,
+    searchingNear: level => `正在搜索 ${level} 附近的对手...`,
+    waitingRanked: code => `正在等待等级相近的排位对手。房间 ${code}。`,
+    connectionIssue: "连接异常，正在尝试重连...",
+    outcomeDraw: reason => `和棋（${reasonText(reason)}）`,
+    outcomeWin: (winner, reason) => `${colorLabel(winner)}因 ${reasonText(reason)} 获胜`,
+    confirmResign: "确认认输？",
+    rematchRequested: "已请求再来一局，等待对手...",
+    spectators: list => `观战：${list}`,
+    waitingOpponentShare: code => `等待对手中... 分享房间码 ${code}。`,
+    yourTurn: "轮到你走。",
+    opponentTurn: "轮到对手。",
+    rankedStatus: status => `排位赛 · ${status}`,
+    rematchVotes: (votes, total) => `再来一局（${votes}/${total}）`,
+    waiting: "等待中...",
+    offline: "离线",
+    roomCopied: "房间码已复制。",
+    noMovesFound: "未找到走法。应为 C3-C4 或 h2e2 这样的 ICCS/UCI 走法。",
+    loadedGame: (title, moves) => `已加载 ${title}（${moves} 步）。`,
+    loadedMoves: moves => `已加载 ${moves} 步。`,
+    foundGames: (count, source, capped, clipped) => `在 ${source} 中找到 ${count} 个棋局。请选择一个导入。${capped}${clipped}`,
+    showingFirst: max => ` 仅显示前 ${max} 个。`,
+    largeFileBeginning: " 大文件仅读取了开头部分。",
+    readFile: name => `正在读取 ${name}...`,
+    couldNotReadFile: error => `无法读取文件：${error}`,
+    pastePath: "请先粘贴 PGN 文件路径。",
+    pathDesktopOnly: "路径加载仅在桌面应用中可用。",
+    readingPath: "正在读取 PGN 路径...",
+    couldNotReadPath: error => `无法读取路径：${error}`,
+    pastedPgn: "粘贴的 PGN",
+    pgnFile: "PGN 文件",
+    loadedLarge: title => `已加载 ${title}；大文件仅读取了开头部分。`,
+    noFileDrop: "拖放中未找到文件。",
+    noMoveAnalyze: "初始局面 - 暂无走法可分析。",
+    analyzing: "正在分析...",
+    noAnalysis: "暂无引擎分析。",
+    analysisFailed: error => `分析失败：${error || "未知错误"}`,
+    movesCount: count => `${count} 步`,
+    piece: { K: "帅", A: "仕", B: "相", N: "马", R: "车", C: "炮", P: "兵", k: "将", a: "士", b: "象", n: "马", r: "车", c: "炮", p: "卒" },
+  },
+};
+
+let lang = loadLanguage();
+
+function loadLanguage() {
+  try {
+    const saved = localStorage.getItem("xiangqi.language");
+    if (saved === "en" || saved === "zh") return saved;
+  } catch { /* ignore */ }
+  return navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function text(key, ...args) {
+  const value = I18N[lang][key] ?? I18N.en[key] ?? key;
+  return typeof value === "function" ? value(...args) : value;
+}
+
+function setText(selector, value) {
+  const el = document.querySelector(selector);
+  if (el) el.textContent = value;
+}
+
+function setAttr(selector, attr, value) {
+  const el = document.querySelector(selector);
+  if (el) el.setAttribute(attr, value);
+}
 
 // Online multiplayer DOM
 const onlineOverlay = qs("#onlineOverlay");
@@ -189,9 +610,9 @@ let currentProfile = loadProfile();
 let online = null;
 
 function levelLabel(level, points = 0) {
-  if (level === "1-1") return "1-1 Beginner";
-  if (level === "10-10") return "10-10 Highest";
-  return `${level || "1-1"} · ${points} pts`;
+  if (level === "1-1") return `1-1 ${text("beginner")}`;
+  if (level === "10-10") return `10-10 ${text("highest")}`;
+  return `${level || "1-1"} · ${points} ${text("points")}`;
 }
 
 function loadProfile() {
@@ -219,18 +640,18 @@ function saveProfile(session) {
 
 function renderProfile() {
   const user = currentProfile.user;
-  profileNameEl.textContent = user?.username || "Guest";
-  profileLevelEl.textContent = user ? levelLabel(user.level, user.points) : "Login required";
+  profileNameEl.textContent = user?.username || text("guest");
+  profileLevelEl.textContent = user ? levelLabel(user.level, user.points) : text("loginRequired");
   loginBtn.hidden = false;
   startupAuthActions.hidden = !!user;
   profilePanel.classList.toggle("logged-in", !!user);
-  loginBtn.textContent = user ? "Logout" : "Login";
+  loginBtn.textContent = user ? text("logout") : text("login");
 }
 
 function openLoginOverlay(mode = "login") {
   loginName.value = currentProfile.user?.username || "";
   loginPassword.value = "";
-  loginStatus.textContent = mode === "signup" ? "Create an account to play ranked matches." : (currentProfile.user ? levelLabel(currentProfile.user.level, currentProfile.user.points) : "Level is earned in online matches.");
+  loginStatus.textContent = mode === "signup" ? text("levelEarned") : (currentProfile.user ? levelLabel(currentProfile.user.level, currentProfile.user.points) : text("levelEarned"));
   loginOverlay.hidden = false;
   setTimeout(() => loginName.focus(), 30);
 }
@@ -292,7 +713,145 @@ function colorOf(piece) {
 }
 
 function colorLabel(color) {
-  return color === "red" ? "Red" : "Black";
+  return color === "red" ? text("red") : text("black");
+}
+
+function reasonText(reason) {
+  if (lang !== "zh") return reason;
+  const labels = {
+    timeout: "超时",
+    checkmate: "将死",
+    stalemate: "困毙",
+    resign: "认输",
+  };
+  return labels[reason] || reason;
+}
+
+function pieceLabel(piece) {
+  return text("piece")[piece] || pieceNames[piece] || piece;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = text("appLang");
+  languageSelect.value = lang;
+  languageSelect.setAttribute("aria-label", text("language"));
+  const profileLabels = qsa(".profile-panel .profile-label");
+  if (profileLabels[0]) profileLabels[0].textContent = text("player");
+  if (profileLabels[1]) profileLabels[1].textContent = text("level");
+  setText(".startup-language-control .profile-label", text("language"));
+  setText("#pgnNav h2", text("pgnReplay"));
+  setText("#pgnImportAgain", text("importAnotherPgn"));
+  setText("#trainerPanel h2", text("trainer"));
+  setText("#trainerPrompt", text("findBestMove"));
+  const trainerStats = qsa(".trainer-stats span");
+  if (trainerStats[0]) trainerStats[0].textContent = text("solved");
+  if (trainerStats[1]) trainerStats[1].textContent = text("streak");
+  if (trainerStats[2]) trainerStats[2].textContent = text("attempts");
+  setText("#trainerHintBtn", text("hint"));
+  setText("#trainerRevealBtn", text("reveal"));
+  setText("#trainerRestartBtn", text("restart"));
+  setText("#clocks h2", text("clock"));
+  const clockLabels = qsa(".clock-label");
+  if (clockLabels[0]) clockLabels[0].textContent = text("red");
+  if (clockLabels[1]) clockLabels[1].textContent = text("black");
+  const modeOptions = modeSelect.querySelectorAll("option");
+  if (modeOptions[0]) modeOptions[0].textContent = text("userVsAi");
+  if (modeOptions[1]) modeOptions[1].textContent = text("trainer");
+  if (modeOptions[2]) modeOptions[2].textContent = text("humanLocal");
+  if (modeOptions[3]) modeOptions[3].textContent = text("userOnline");
+  if (modeOptions[4]) modeOptions[4].textContent = text("pgnViewer");
+  const sideOptions = playerSide.querySelectorAll("option");
+  if (sideOptions[0]) sideOptions[0].textContent = text("red");
+  if (sideOptions[1]) sideOptions[1].textContent = text("black");
+  const controlsLabels = qsa(".controls label");
+  if (controlsLabels[1]?.firstChild) controlsLabels[1].firstChild.textContent = `${text("youPlay")} `;
+  if (controlsLabels[2]?.firstChild) controlsLabels[2].firstChild.textContent = `${text("engineDepth")} `;
+  setText("#newGameBtn", text("newGame"));
+  setText(".score-head span", text("realtimeScore"));
+  const scoreLabels = qsa(".score-labels span");
+  if (scoreLabels[0]) scoreLabels[0].textContent = text("black");
+  if (scoreLabels[1]) scoreLabels[1].textContent = text("red");
+  setText(".analysis h2", text("moveAnalysis"));
+  setText(".history h2", text("moves"));
+  setText("#undoBtn", text("undo"));
+  setText("#downloadPgnBtn", text("downloadPgn"));
+  setText("#exitBtn", text("exit"));
+  setText("#startupTitle", text("chooseMode"));
+  setText("#startupModeStep .startup-hint", text("chooseModeHint"));
+  setText("#startupLoginBtn", text("login"));
+  setText("#startupSignupBtn", text("signup"));
+  const optionLabels = [
+    [text("vsAi"), text("vsAiHint")],
+    [text("trainer"), text("trainerHintMode")],
+    [text("vsHumanLocal"), text("vsHumanLocalHint")],
+    [text("vsHumanOnline"), text("vsHumanOnlineHint")],
+    [text("pgnViewer"), text("pgnViewerHint")],
+  ];
+  qsa("#startupModeStep .startup-option").forEach((btn, index) => {
+    const strong = btn.querySelector("strong");
+    const span = btn.querySelector("span");
+    if (strong && optionLabels[index]) strong.textContent = optionLabels[index][0];
+    if (span && optionLabels[index]) span.textContent = optionLabels[index][1];
+  });
+  setText("#startupSideStep h2", text("chooseSide"));
+  setText("#startupSideStep .startup-hint", text("redFirst"));
+  const sideLabels = [[text("playRed"), text("moveFirst")], [text("playBlack"), text("pikafishFirst")]];
+  qsa("#startupSideStep .startup-side-option").forEach((btn, index) => {
+    const strong = btn.querySelector("strong");
+    const span = btn.querySelector("span");
+    if (strong && sideLabels[index]) strong.textContent = sideLabels[index][0];
+    if (span && sideLabels[index]) span.textContent = sideLabels[index][1];
+  });
+  setText("#startupSideBack", `← ${text("back")}`);
+  setText("#loginTitle", text("login"));
+  setText("#loginOverlay .startup-hint", text("loginHint"));
+  const loginLabels = qsa("#loginForm .stack-label");
+  if (loginLabels[0]?.firstChild) loginLabels[0].firstChild.textContent = `${text("username")}\n            `;
+  if (loginLabels[1]?.firstChild) loginLabels[1].firstChild.textContent = `${text("password")}\n            `;
+  setAttr("#loginName", "placeholder", text("yourName"));
+  setAttr("#loginPassword", "placeholder", text("password"));
+  setText("#loginSaveBtn", text("login"));
+  setText("#signupBtn", text("signup"));
+  setText("#pgnTitle", text("importPgn"));
+  setText("#pgnOverlay .startup-hint", text("pgnImportHint"));
+  setText("#pgnDropZone", text("dropPgn"));
+  setText("#pgnPathLoadBtn", text("loadPath"));
+  setText("#pgnLoadBtn", text("loadPgn"));
+  setText("#onlineOverlayTitle", text("onlinePlay"));
+  const onlineLabel = document.querySelector("#onlineLobby label");
+  if (onlineLabel?.firstChild) onlineLabel.firstChild.textContent = `${text("account")}\n              `;
+  setAttr("#onlineNickname", "placeholder", text("loginFirst"));
+  setText("#onlineCreateBtn", text("createRoom"));
+  setText("#onlineQueueBtn", text("randomMatch"));
+  setText("#onlineRankedQueueBtn", text("rankMatch"));
+  setAttr("#onlineJoinCode", "placeholder", text("roomCode"));
+  setText("#onlineJoinBtn", text("join"));
+  setText("#onlineSpectateBtn", text("spectate"));
+  setText(".online-label", text("room"));
+  setText("#onlineCopyCode", text("copy"));
+  setText("#onlineLeaveBtn", text("leave"));
+  setText("#onlineResignBtn", text("resign"));
+  setAttr("#fenText", "title", text("clickToCopy"));
+  setAttr("#fenCopyBtn", "title", text("copyFen"));
+  setText("#fenCopyBtn", text("copy"));
+  setAttr("#pgnFirstBtn", "title", text("start"));
+  setAttr("#pgnPrevBtn", "title", text("previous"));
+  setAttr("#pgnNextBtn", "title", text("next"));
+  setAttr("#pgnLastBtn", "title", text("end"));
+  setAttr("#loginCloseBtn", "aria-label", text("close"));
+  setAttr("#pgnOverlayClose", "aria-label", text("close"));
+  setAttr("#overlayCloseBtn", "aria-label", text("close"));
+  setAttr("#onlineCopyCode", "title", text("copy"));
+  if (!history.length && modeSelect.value !== "pgn") moveScore.textContent = text("moveToSeeScore");
+  renderProfile();
+  renderBoard();
+  renderHistory();
+  renderTrainerPanel();
+  if (online) renderOnlineMatch();
+  if (modeSelect.value === "pgn") {
+    pgnUpdateNavUI();
+    pgnRenderAnalysis();
+  }
 }
 
 function inBounds(r, c) {
@@ -468,7 +1027,7 @@ function uciToMove(uci) {
 }
 
 function moveLabel(record) {
-  return `${record.side === "red" ? "Red" : "Black"} ${pieceNames[record.piece]} ${squareToUci(record.fromR, record.fromC)}-${squareToUci(record.toR, record.toC)}`;
+  return `${colorLabel(record.side)} ${pieceLabel(record.piece)} ${squareToUci(record.fromR, record.fromC)}-${squareToUci(record.toR, record.toC)}`;
 }
 
 function moveLabelFromBoard(uci, sourceBoard, side) {
@@ -476,7 +1035,7 @@ function moveLabelFromBoard(uci, sourceBoard, side) {
   if (!move) return null;
   const piece = sourceBoard[move.fromR]?.[move.fromC];
   if (!piece) return uci;
-  return `${side === "red" ? "Red" : "Black"} ${pieceNames[piece]} ${squareToUci(move.fromR, move.fromC)}-${squareToUci(move.toR, move.toC)}`;
+  return `${colorLabel(side)} ${pieceLabel(piece)} ${squareToUci(move.fromR, move.fromC)}-${squareToUci(move.toR, move.toC)}`;
 }
 
 function recordToUci(record) {
@@ -626,7 +1185,7 @@ function renderBoard() {
     }
   }
   if (!turnPill.classList.contains("winner")) {
-    turnPill.textContent = `${turn === "red" ? "Red" : "Black"} to move`;
+    turnPill.textContent = text("colorToMove", turn);
     turnPill.classList.toggle("black", turn === "black");
   }
   fenText.textContent = boardToFen();
@@ -797,7 +1356,7 @@ function clockTimeout(loser) {
   } else {
     gameResult = { winner, reason: "timeout" };
     busy = true;
-    statusText.textContent = `${loser === "red" ? "Red" : "Black"} flagged. ${winner === "red" ? "Red" : "Black"} wins on time.`;
+    statusText.textContent = text("flagged", loser, winner);
   }
 }
 
@@ -835,7 +1394,7 @@ async function makeMove(fromR, fromC, toR, toC, source = "human") {
   // Online: send the move to the server (only when this client originated it).
   if (isOnline && online && source !== "remote" && online.role === "player") {
     onlineSendMove(playedUci, boardToFen()).catch(err => {
-      onlineMatchStatus.textContent = `Move not sent: ${err.message}`;
+      onlineMatchStatus.textContent = text("moveNotSent", err.message);
     });
   }
 
@@ -879,8 +1438,7 @@ function announceLocalEnd(ending) {
   gameResult = ending;
   busy = true;
   stopClock();
-  const winnerName = ending.winner === "red" ? "Red" : "Black";
-  const message = `${winnerName} wins by ${ending.reason}!`;
+  const message = text("winsBy", ending.winner, ending.reason);
   statusText.textContent = message;
   turnPill.textContent = message;
   turnPill.classList.add("winner");
@@ -921,9 +1479,9 @@ function gradePlayedMove(moves, mover, playedUci, playedScore = null) {
 }
 
 function moveQualityText(grade) {
-  if (grade.quality === "best") return "Best move.";
-  if (grade.quality === "good") return `Good move: lost ${cpLossText(grade.lossCp)}.`;
-  if (grade.lossCp != null) return `Needs work: lost ${cpLossText(grade.lossCp)}.`;
+  if (grade.quality === "best") return text("bestMove", "").replace(": .", ".").replace("：。", "。");
+  if (grade.quality === "good") return text("goodMoveLoss", cpLossText(grade.lossCp));
+  if (grade.lossCp != null) return text("needsWork", cpLossText(grade.lossCp));
   return "";
 }
 
@@ -938,7 +1496,7 @@ function showRecommendations(moves, beforeBoard, mover, playedUci, playedScore =
       const matched = m.move === playedUci ? " ✓" : "";
       return `${i + 1}. ${label} (${scoreText})${matched}`;
     });
-  const recommendations = recLines.length ? `Recommendations:\n${recLines.join("\n")}` : "";
+  const recommendations = recLines.length ? text("recommendations", recLines.join("\n")) : "";
   lastUserRecommendationText = [quality, recommendations].filter(Boolean).join("\n\n");
   moveScore.textContent = lastUserRecommendationText;
 }
@@ -1013,20 +1571,20 @@ async function enginePost(path, data) {
     if (path === "/api/evaluate") return api.evaluate(data);
     if (path === "/api/bestmove") return api.bestmove(data);
     if (path === "/api/topmoves") return api.topmoves(data);
-    throw new Error(`Unknown engine path: ${path}`);
+    throw new Error(text("unknownEnginePath", path));
   }
-  throw new Error("Engine is only available in the Electron client.");
+  throw new Error(text("engineOnlyElectron"));
 }
 
 async function evaluatePosition() {
   const requestId = ++evalRequest;
-  statusText.textContent = "Pikafish is analyzing...";
+  statusText.textContent = text("pikafishAnalyzing");
   try {
     const result = await enginePost("/api/evaluate", { fen: boardToFen(), depth: Number(depthInput.value) });
     if (requestId === evalRequest) {
       updateScore(result.score);
       pvLine.textContent = result.pv?.length ? `PV ${result.pv.join(" ")}` : "";
-      statusText.textContent = "Pikafish ready";
+      statusText.textContent = text("pikafishReady");
     }
     return result;
   } catch (error) {
@@ -1040,14 +1598,14 @@ async function maybeAiMove() {
   if (modeSelect.value === "online" || modeSelect.value === "pgn") return;
   if (modeSelect.value !== "ai" || playerSide.value === turn) return;
   busy = true;
-  statusText.textContent = "Pikafish is choosing a move...";
+  statusText.textContent = text("choosingMove");
   try {
     const result = await enginePost("/api/bestmove", { fen: boardToFen(), depth: Number(depthInput.value) + 1 });
     const move = uciToMove(result.bestMove);
     if (move && board[move.fromR]?.[move.fromC]) {
       await makeMove(move.fromR, move.fromC, move.toR, move.toC, "engine");
     } else {
-      statusText.textContent = "Pikafish returned no legal move.";
+      statusText.textContent = text("noLegalMove");
     }
   } catch (error) {
     statusText.textContent = error.message;
@@ -1095,31 +1653,31 @@ function trainerTopMoveLines() {
       const score = formatRecommendationScore(move, turn);
       return `${index + 1}. ${label} (${score})`;
     });
-  return lines.length ? `Best lines:\n${lines.join("\n")}` : "No best line available.";
+  return lines.length ? text("bestLines", lines.join("\n")) : text("noBestLine");
 }
 
 function trainerPromptText() {
   if (gameResult) {
-    if (gameResult.winner === "draw") return `Draw by ${gameResult.reason}.`;
-    return `${colorLabel(gameResult.winner)} wins by ${gameResult.reason}.`;
+    if (gameResult.winner === "draw") return text("drawBy", gameResult.reason);
+    return text("winsBy", gameResult.winner, gameResult.reason).replace(/!$/, ".");
   }
-  if (turn !== playerSide.value) return `${colorLabel(turn)} reply is being played.`;
-  if (trainerState.status === "loading") return `Preparing ${colorLabel(turn)} position.`;
-  if (trainerState.status === "error") return "Trainer is unavailable for this position.";
-  return `Find ${colorLabel(turn)}'s best move.`;
+  if (turn !== playerSide.value) return text("replyPlayed", turn);
+  if (trainerState.status === "loading") return text("preparingColorPosition", turn);
+  if (trainerState.status === "error") return text("trainerUnavailablePosition");
+  return text("findColorBest", turn);
 }
 
 function trainerLineText() {
-  if (trainerState.status === "error") return trainerState.message || "Trainer unavailable.";
-  if (trainerState.status === "loading") return "Preparing position.";
-  if (turn !== playerSide.value) return `${colorLabel(turn)} is Pikafish's side.`;
+  if (trainerState.status === "error") return trainerState.message || text("trainerUnavailable");
+  if (trainerState.status === "loading") return text("preparingPosition");
+  if (turn !== playerSide.value) return text("pikafishSide", turn);
   if (trainerState.revealed) return trainerTopMoveLines();
   if (trainerState.hintLevel >= 1 && trainerState.bestMove) {
     const move = uciToMove(trainerState.bestMove);
     const piece = board[move?.fromR]?.[move?.fromC];
-    if (move && piece) return `Hint: ${pieceNames[piece]} from ${squareToUci(move.fromR, move.fromC)}.`;
+    if (move && piece) return text("hintPieceFrom", pieceLabel(piece), squareToUci(move.fromR, move.fromC));
   }
-  return trainerState.message || "Position ready.";
+  return trainerState.message || text("positionReady");
 }
 
 function renderTrainerPanel() {
@@ -1127,7 +1685,7 @@ function renderTrainerPanel() {
   trainerPanel.hidden = !active;
   undoBtn.disabled = active;
   if (!active) return;
-  trainerSide.textContent = `${colorLabel(playerSide.value)} trainer`;
+  trainerSide.textContent = playerSide.value === "red" ? text("redTrainer") : text("blackTrainer");
   trainerPrompt.textContent = trainerPromptText();
   trainerSolved.textContent = String(trainerState.solved);
   trainerStreak.textContent = String(trainerState.streak);
@@ -1150,7 +1708,7 @@ async function prepareTrainerChallenge() {
       status: "waiting",
       moves: [],
       bestMove: null,
-      message: `${colorLabel(turn)} is Pikafish's side.`,
+      message: text("pikafishSide", turn),
       hintLevel: 0,
       revealed: false,
     };
@@ -1168,12 +1726,12 @@ async function prepareTrainerChallenge() {
     status: "loading",
     moves: [],
     bestMove: null,
-    message: "Preparing position.",
+    message: text("preparingPosition"),
     hintLevel: 0,
     revealed: false,
   };
-  statusText.textContent = "Preparing trainer position...";
-  moveScore.textContent = "Trainer is preparing the position.";
+  statusText.textContent = text("preparingTrainer");
+  moveScore.textContent = text("trainerPreparing");
   renderTrainerPanel();
   renderBoard();
 
@@ -1189,10 +1747,10 @@ async function prepareTrainerChallenge() {
       status: bestMove ? "ready" : "error",
       moves,
       bestMove,
-      message: bestMove ? "Position ready." : "No trainer move found.",
+      message: bestMove ? text("positionReady") : text("noTrainerMoveFound"),
     };
-    statusText.textContent = bestMove ? "Trainer ready" : "Trainer could not find a move.";
-    moveScore.textContent = bestMove ? `Find ${colorLabel(turn)}'s best move.` : "No trainer move available.";
+    statusText.textContent = bestMove ? text("trainerReady") : text("trainerCouldNotFind");
+    moveScore.textContent = bestMove ? text("findColorBest", turn) : text("noTrainerMove");
   } catch (error) {
     if (requestId !== trainerState.requestId || modeSelect.value !== "trainer") return;
     trainerState = {
@@ -1203,7 +1761,7 @@ async function prepareTrainerChallenge() {
       message: error.message,
     };
     statusText.textContent = error.message;
-    moveScore.textContent = `Trainer unavailable: ${error.message}`;
+    moveScore.textContent = text("trainerUnavailableError", error.message);
   }
   renderTrainerPanel();
   renderBoard();
@@ -1224,12 +1782,12 @@ async function trainerMaybeOpponentMove() {
     status: "waiting",
     moves: [],
     bestMove: null,
-    message: `${colorLabel(turn)} is Pikafish's side.`,
+    message: text("pikafishSide", turn),
     hintLevel: 0,
     revealed: false,
   };
   busy = true;
-  statusText.textContent = "Pikafish is choosing a trainer reply...";
+  statusText.textContent = text("choosingTrainerReply");
   renderTrainerPanel();
   renderBoard();
 
@@ -1239,7 +1797,7 @@ async function trainerMaybeOpponentMove() {
     const result = await enginePost("/api/bestmove", { fen, depth: Number(depthInput.value) + 1 });
     if (modeSelect.value !== "trainer" || fen !== boardToFen()) return;
     const move = uciToMove(result.bestMove);
-    if (!isLegalParsedMove(move)) throw new Error("Pikafish returned no legal reply.");
+    if (!isLegalParsedMove(move)) throw new Error(text("noLegalReply"));
     applyMove(move.fromR, move.fromC, move.toR, move.toC, "engine");
     renderBoard();
     renderHistory();
@@ -1258,7 +1816,7 @@ async function trainerMaybeOpponentMove() {
       message: error.message,
     };
     statusText.textContent = error.message;
-    moveScore.textContent = `Trainer stopped: ${error.message}`;
+    moveScore.textContent = text("trainerStopped", error.message);
   } finally {
     if (!ended) busy = false;
     renderBoard();
@@ -1281,7 +1839,7 @@ async function submitTrainerMove(fromR, fromC, toR, toC) {
   if (modeSelect.value !== "trainer" || busy) return;
   const fen = boardToFen();
   if (trainerState.status !== "ready" || trainerState.fen !== fen || !trainerState.bestMove) {
-    trainerState.message = "Position is still preparing.";
+    trainerState.message = text("stillPreparing");
     renderTrainerPanel();
     return;
   }
@@ -1297,14 +1855,14 @@ async function submitTrainerMove(fromR, fromC, toR, toC) {
     trainerState.revealed = false;
     if (grade.rank > 1) {
       const candidate = trainerState.moves[grade.rank - 1];
-      const loss = grade.lossCp != null ? `, lost ${cpLossText(grade.lossCp)}` : "";
-      trainerState.message = `Choice #${grade.rank} (${formatRecommendationScore(candidate, mover)}${loss}). Try to stay within 1.00.`;
+      const loss = grade.lossCp != null ? text("lostSuffix", cpLossText(grade.lossCp)) : "";
+      trainerState.message = text("choiceTry", grade.rank, formatRecommendationScore(candidate, mover), loss);
     } else if (grade.lossCp != null) {
-      trainerState.message = `Lost ${cpLossText(grade.lossCp)}. Try to stay within 1.00.`;
+      trainerState.message = text("lostTry", cpLossText(grade.lossCp));
     } else {
-      trainerState.message = "Legal, but outside Pikafish's top lines.";
+      trainerState.message = text("outsideTopLines");
     }
-    statusText.textContent = "Try again.";
+    statusText.textContent = text("tryAgain");
     moveScore.textContent = trainerState.message;
     renderTrainerPanel();
     return;
@@ -1320,8 +1878,8 @@ async function submitTrainerMove(fromR, fromC, toR, toC) {
   trainerState.hintLevel = 0;
   trainerState.revealed = false;
   trainerState.message = grade.quality === "best"
-    ? `Best move: ${label}.`
-    : `Good move: ${label} (lost ${cpLossText(grade.lossCp)}).`;
+    ? text("bestMove", label)
+    : text("goodMove", label, cpLossText(grade.lossCp));
   moveScore.textContent = trainerState.message;
 
   busy = true;
@@ -1377,7 +1935,7 @@ function resetGameLocal() {
   currentEval = 0;
   busy = false;
   turnPill.classList.remove("winner");
-  moveScore.textContent = "Make a move to see Pikafish’s score.";
+  moveScore.textContent = text("moveToSeeScore");
   pvLine.textContent = "";
   updateScore(0);
   renderBoard();
@@ -1392,7 +1950,7 @@ function resetGameLocal() {
 
 function resetGame() {
   if (modeSelect.value === "online") {
-    onlineLobbyStatus.textContent = "Use the room controls to start a new online game.";
+    onlineLobbyStatus.textContent = text("onlineNewGame");
     return;
   }
   if (modeSelect.value === "trainer") {
@@ -1407,11 +1965,11 @@ function resetGame() {
 
 function undo() {
   if (modeSelect.value === "online") {
-    onlineMatchStatus.textContent = "Undo isn't available in online play.";
+    onlineMatchStatus.textContent = text("undoOnline");
     return;
   }
   if (modeSelect.value === "trainer") {
-    trainerState.message = "Undo is disabled during scored training.";
+    trainerState.message = text("undoTrainer");
     renderTrainerPanel();
     return;
   }
@@ -1450,14 +2008,14 @@ async function loadStatus() {
   // Engine status comes from the Electron main process; if we're not in Electron, say so.
   const api = window.api?.engine;
   if (!api) {
-    statusText.textContent = "Open in the Electron app for Pikafish analysis.";
+    statusText.textContent = text("engineElectron");
     return;
   }
   try {
     const status = await api.status();
-    statusText.textContent = status.engine && status.nnue ? "Pikafish ready" : "Pikafish or NNUE file missing";
+    statusText.textContent = status.engine && status.nnue ? text("pikafishReady") : text("pikafishMissing");
   } catch (e) {
-    statusText.textContent = `Engine unavailable: ${e.message}`;
+    statusText.textContent = text("engineUnavailable", e.message);
   }
 }
 
@@ -1485,7 +2043,7 @@ function applyRemoteMove(uci) {
   const { fromR, fromC, toR, toC } = parsed;
   const piece = board[fromR]?.[fromC];
   if (!piece) {
-    onlineMatchStatus.textContent = "Got an out-of-sync move from opponent. Reload to resync.";
+    onlineMatchStatus.textContent = text("outOfSync");
     return;
   }
   // Reuse makeMove with source "remote" so we don't re-broadcast.
@@ -1523,7 +2081,7 @@ async function postJson(path, data) {
     body: JSON.stringify(data),
   });
   const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(json.error || `Request failed (${response.status})`);
+  if (!response.ok) throw new Error(json.error || text("requestFailed", response.status));
   return json;
 }
 
@@ -1540,7 +2098,7 @@ async function signupOnServer(username, password) {
 }
 
 async function submitAuth(mode) {
-  loginStatus.textContent = mode === "signup" ? "Creating account..." : "Logging in...";
+  loginStatus.textContent = mode === "signup" ? text("creatingAccount") : text("loggingIn");
   const user = mode === "signup"
     ? await signupOnServer(loginName.value, loginPassword.value)
     : await loginOnServer(loginName.value, loginPassword.value);
@@ -1563,14 +2121,14 @@ async function refreshProfile() {
 
 function requireLoginForMatch() {
   if (currentProfile.token && currentProfile.user) return true;
-  onlineLobbyStatus.textContent = "Login before playing online.";
+  onlineLobbyStatus.textContent = text("loginBeforeOnline");
   openLoginOverlay();
   return false;
 }
 
 async function onlineCreate() {
   if (!requireLoginForMatch()) return;
-  onlineLobbyStatus.textContent = "Creating room…";
+  onlineLobbyStatus.textContent = text("creatingRoom");
   try {
     const result = await postJson("/api/match/create", { token: currentProfile.token, color: "red" });
     enterRoom(result);
@@ -1583,10 +2141,10 @@ async function onlineJoin(role = "player") {
   if (!requireLoginForMatch()) return;
   const code = onlineJoinCode.value.trim().toUpperCase();
   if (!/^[A-Z0-9]{3,6}$/.test(code)) {
-    onlineLobbyStatus.textContent = "Enter a valid room code.";
+    onlineLobbyStatus.textContent = text("validRoomCode");
     return;
   }
-  onlineLobbyStatus.textContent = role === "spectator" ? "Joining as spectator…" : "Joining room…";
+  onlineLobbyStatus.textContent = role === "spectator" ? text("joiningSpectator") : text("joiningRoom");
   try {
     const result = await postJson("/api/match/join", { token: currentProfile.token, code, role });
     enterRoom(result);
@@ -1597,11 +2155,11 @@ async function onlineJoin(role = "player") {
 
 async function onlineQueue() {
   if (!requireLoginForMatch()) return;
-  onlineLobbyStatus.textContent = "Searching for an opponent…";
+  onlineLobbyStatus.textContent = text("searchingOpponent");
   try {
     const result = await postJson("/api/match/queue", { token: currentProfile.token });
     enterRoom(result);
-    if (!result.matched) onlineLobbyStatus.textContent = `Waiting for an opponent. Share code ${result.code} to invite a friend.`;
+    if (!result.matched) onlineLobbyStatus.textContent = text("waitingShareCode", result.code);
   } catch (e) {
     onlineLobbyStatus.textContent = e.message;
   }
@@ -1609,11 +2167,11 @@ async function onlineQueue() {
 
 async function onlineRankedQueue() {
   if (!requireLoginForMatch()) return;
-  onlineLobbyStatus.textContent = `Searching near ${currentProfile.user?.level || "1-1"}…`;
+  onlineLobbyStatus.textContent = text("searchingNear", currentProfile.user?.level || "1-1");
   try {
     const result = await postJson("/api/match/ranked-queue", { token: currentProfile.token });
     enterRoom(result);
-    if (!result.matched) onlineLobbyStatus.textContent = `Waiting for a ranked opponent near your level. Room ${result.code}.`;
+    if (!result.matched) onlineLobbyStatus.textContent = text("waitingRanked", result.code);
   } catch (e) {
     onlineLobbyStatus.textContent = e.message;
   }
@@ -1679,7 +2237,7 @@ async function openEventStream() {
   es.addEventListener("rematch_started", e => onlineHandleRematchStarted(JSON.parse(e.data)));
   es.addEventListener("gameover", e => onlineHandleGameOver(JSON.parse(e.data)));
   es.onerror = () => {
-    onlineMatchStatus.textContent = "Connection issue — trying to reconnect…";
+    onlineMatchStatus.textContent = text("connectionIssue");
   };
 }
 
@@ -1772,9 +2330,8 @@ function onlineHandleGameOver(data) {
 }
 
 function describeOutcome(winner, reason) {
-  if (winner === "draw") return `draw (${reason})`;
-  const color = winner === "red" ? "Red" : "Black";
-  return `${color} wins by ${reason}`;
+  if (winner === "draw") return text("outcomeDraw", reason);
+  return text("outcomeWin", winner, reason);
 }
 
 async function onlineSendMove(uci, fen) {
@@ -1794,7 +2351,7 @@ async function onlineDeclareGameOver(winner, reason) {
 
 async function onlineResign() {
   if (!online || online.role !== "player" || online.status !== "playing") return;
-  if (!confirm("Resign the game?")) return;
+  if (!confirm(text("confirmResign"))) return;
   try {
     await postJson(`/api/match/${encodeURIComponent(online.code)}/resign`, { playerId: online.playerId });
   } catch (e) {
@@ -1806,7 +2363,7 @@ async function onlineRematch() {
   if (!online || online.role !== "player" || online.status !== "finished") return;
   try {
     await postJson(`/api/match/${encodeURIComponent(online.code)}/rematch`, { playerId: online.playerId });
-    onlineMatchStatus.textContent = "Rematch requested. Waiting for opponent…";
+    onlineMatchStatus.textContent = text("rematchRequested");
   } catch (e) {
     onlineMatchStatus.textContent = e.message;
   }
@@ -1836,30 +2393,30 @@ function renderOnlineMatch() {
   setPlayerSlot(onlinePlayerBlack, black, "black");
 
   if (online.spectators.length) {
-    onlineSpectators.textContent = `Spectators: ${online.spectators.map(s => s.nickname).join(", ")}`;
+    onlineSpectators.textContent = text("spectators", online.spectators.map(s => s.nickname).join(", "));
   } else {
     onlineSpectators.textContent = "";
   }
 
   let status = "";
-  if (online.status === "waiting") status = `Waiting for an opponent… share code ${online.code}.`;
+  if (online.status === "waiting") status = text("waitingOpponentShare", online.code);
   else if (online.status === "playing") {
-    if (online.role === "spectator") status = `${turn === "red" ? "Red" : "Black"} to move.`;
-    else if (online.myColor === turn) status = "Your turn.";
-    else status = "Opponent's turn.";
+    if (online.role === "spectator") status = text("colorToMove", turn);
+    else if (online.myColor === turn) status = text("yourTurn");
+    else status = text("opponentTurn");
   } else if (online.status === "finished") {
     status = describeOutcome(online.winner, online.winReason || "");
   }
-  if (online.ranked && status) status = `Rank match · ${status}`;
+  if (online.ranked && status) status = text("rankedStatus", status);
   onlineMatchStatus.textContent = status;
 
   const isPlayer = online.role === "player";
   onlineResignBtn.hidden = !(isPlayer && online.status === "playing");
   onlineRematchBtn.hidden = !(isPlayer && online.status === "finished");
   if (online.rematchVotes?.length) {
-    onlineRematchBtn.textContent = `Rematch (${online.rematchVotes.length}/${online.players.length})`;
+    onlineRematchBtn.textContent = text("rematchVotes", online.rematchVotes.length, online.players.length);
   } else {
-    onlineRematchBtn.textContent = "Rematch";
+    onlineRematchBtn.textContent = text("rematch");
   }
 }
 
@@ -1869,10 +2426,10 @@ function setPlayerSlot(el, player, color) {
   el.classList.toggle("turn", online?.status === "playing" && turn === color);
   if (player) {
     const level = player.level ? ` · ${player.level}` : "";
-    nameEl.textContent = `${player.nickname}${level}${player.online === false ? " (offline)" : ""}`;
+    nameEl.textContent = `${player.nickname}${level}${player.online === false ? ` (${text("offline")})` : ""}`;
     nameEl.removeAttribute("data-empty");
   } else {
-    nameEl.textContent = "Waiting…";
+    nameEl.textContent = text("waiting");
     nameEl.setAttribute("data-empty", "");
   }
 }
@@ -1897,7 +2454,7 @@ onlineCopyCode.addEventListener("click", async () => {
   if (!online) return;
   try {
     await navigator.clipboard.writeText(online.code);
-    onlineMatchStatus.textContent = "Room code copied.";
+    onlineMatchStatus.textContent = text("roomCopied");
   } catch { /* ignore */ }
 });
 window.addEventListener("beforeunload", () => {
@@ -1939,6 +2496,12 @@ signupBtn.addEventListener("click", async () => {
 depthInput.addEventListener("input", () => {
   depthLabel.textContent = depthInput.value;
 });
+languageSelect.addEventListener("change", () => {
+  lang = languageSelect.value === "zh" ? "zh" : "en";
+  try { localStorage.setItem("xiangqi.language", lang); } catch { /* ignore */ }
+  applyLanguage();
+  loadStatus();
+});
 modeSelect.addEventListener("change", () => {
   const isOnline = modeSelect.value === "online";
   const isPgn = modeSelect.value === "pgn";
@@ -1968,7 +2531,7 @@ fenCopyBtn.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(fenText.textContent || "");
     const original = fenCopyBtn.textContent;
-    fenCopyBtn.textContent = "copied";
+    fenCopyBtn.textContent = text("copied");
     setTimeout(() => { fenCopyBtn.textContent = original; }, 1200);
   } catch { /* clipboard not available */ }
 });
@@ -2040,7 +2603,7 @@ function describePgnGame(text, index, sourceTitle) {
   const moves = pgnParseText(text);
   const title = event || `${sourceTitle} #${index + 1}`;
   const players = [red, black].filter(Boolean).join(" vs ");
-  const details = [players, date, result, `${moves.length} move${moves.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+  const details = [players, date, result, text("movesCount", moves.length)].filter(Boolean).join(" · ");
   return { text, title, details, moves };
 }
 
@@ -2069,13 +2632,13 @@ function pgnParseText(text) {
 function pgnLoadText(text, meta = null) {
   const moves = pgnParseText(text);
   if (!moves.length) {
-    pgnStatus.textContent = "No moves found. Expected ICCS/UCI moves like C3-C4 or h2e2.";
+    pgnStatus.textContent = text("noMovesFound");
     return false;
   }
   pgnMoves = moves;
   pgnIndex = 0;
   pgnAnalysisCache.clear();
-  pgnStatus.textContent = meta ? `Loaded ${meta.title} (${moves.length} moves).` : `Loaded ${moves.length} move(s).`;
+  pgnStatus.textContent = meta ? text("loadedGame", meta.title, moves.length) : text("loadedMoves", moves.length);
   pgnApplyPosition();
   pgnNav.hidden = false;
   return true;
@@ -2098,14 +2661,14 @@ function renderPgnGameList(sourceTitle, truncated = false) {
     const title = document.createElement("strong");
     title.textContent = `${index + 1}. ${game.title}`;
     const details = document.createElement("span");
-    details.textContent = game.details || `${game.moves.length} moves`;
+    details.textContent = game.details || text("movesCount", game.moves.length);
     btn.append(title, details);
     fragment.append(btn);
   }
   pgnGameList.replaceChildren(fragment);
-  const capped = pgnImportGames.length >= MAX_PGN_IMPORT_GAMES ? ` Showing first ${MAX_PGN_IMPORT_GAMES}.` : "";
-  const clipped = truncated ? " Large file was read only at the beginning." : "";
-  pgnStatus.textContent = `Found ${pgnImportGames.length} games in ${sourceTitle}. Choose one to import.${capped}${clipped}`;
+  const capped = pgnImportGames.length >= MAX_PGN_IMPORT_GAMES ? text("showingFirst", MAX_PGN_IMPORT_GAMES) : "";
+  const clipped = truncated ? text("largeFileBeginning") : "";
+  pgnStatus.textContent = text("foundGames", pgnImportGames.length, sourceTitle, capped, clipped);
 }
 
 function openPgnImportGame(index) {
@@ -2125,14 +2688,14 @@ async function importPgnSource(text, title, truncated = false, { autoLoadSingle 
     .map((chunk, index) => describePgnGame(chunk, index, title))
     .filter(game => game.moves.length);
   if (!games.length) {
-    pgnStatus.textContent = "No moves found. Expected ICCS/UCI moves like C3-C4 or h2e2.";
+    pgnStatus.textContent = text("noMovesFound");
     return;
   }
   if (games.length === 1 && autoLoadSingle) {
     pgnInput.value = games[0].text;
     if (pgnLoadText(games[0].text, { title: games[0].title })) {
       if (truncated) {
-        pgnStatus.textContent = `Loaded ${games[0].title}; large file was read only at the beginning.`;
+        pgnStatus.textContent = text("loadedLarge", games[0].title);
       }
       closePgnOverlay();
     }
@@ -2145,33 +2708,33 @@ async function importPgnSource(text, title, truncated = false, { autoLoadSingle 
 
 async function loadPgnBrowserFile(file) {
   if (!file) return;
-  pgnStatus.textContent = `Reading ${file.name}...`;
+  pgnStatus.textContent = text("readFile", file.name);
   try {
     const truncated = file.size > MAX_PGN_IMPORT_BYTES;
     const text = await file.slice(0, MAX_PGN_IMPORT_BYTES).text();
-    await importPgnSource(text, file.name || "PGN file", truncated);
+    await importPgnSource(text, file.name || text("pgnFile"), truncated);
   } catch (e) {
-    pgnStatus.textContent = `Could not read file: ${e.message}`;
+    pgnStatus.textContent = text("couldNotReadFile", e.message);
   }
 }
 
 async function loadPgnPath() {
   const filePath = String(pgnPathInput.value || "").trim();
   if (!filePath) {
-    pgnStatus.textContent = "Paste a PGN file path first.";
+    pgnStatus.textContent = text("pastePath");
     return;
   }
   if (!window.api?.pgnFile?.readPath) {
-    pgnStatus.textContent = "Path loading is only available in the desktop app.";
+    pgnStatus.textContent = text("pathDesktopOnly");
     return;
   }
   pgnPathLoadBtn.disabled = true;
-  pgnStatus.textContent = "Reading PGN path...";
+  pgnStatus.textContent = text("readingPath");
   try {
     const result = await window.api.pgnFile.readPath(filePath);
-    await importPgnSource(String(result?.text || ""), result?.name || "PGN file", Boolean(result?.truncated));
+    await importPgnSource(String(result?.text || ""), result?.name || text("pgnFile"), Boolean(result?.truncated));
   } catch (e) {
-    pgnStatus.textContent = `Could not read path: ${e.message}`;
+    pgnStatus.textContent = text("couldNotReadPath", e.message);
   } finally {
     pgnPathLoadBtn.disabled = false;
   }
@@ -2182,21 +2745,21 @@ const pgnAnalysisCache = new Map();
 
 function pgnRenderAnalysis() {
   if (pgnIndex === 0) {
-    moveScore.textContent = "Start position — no move to analyze yet.";
+    moveScore.textContent = text("noMoveAnalyze");
     return;
   }
   const entry = pgnAnalysisCache.get(pgnIndex);
   if (!entry || entry.status === "pending") {
-    moveScore.textContent = "Analyzing…";
+    moveScore.textContent = text("analyzing");
     return;
   }
   if (entry.status === "done") {
     moveScore.textContent = entry.lines.length
-      ? `Recommendations:\n${entry.lines.join("\n")}`
-      : "No engine analysis available.";
+      ? text("recommendations", entry.lines.join("\n"))
+      : text("noAnalysis");
     return;
   }
-  moveScore.textContent = `Analysis failed: ${entry.error || "unknown"}`;
+  moveScore.textContent = text("analysisFailed", entry.error);
 }
 
 async function pgnComputeAnalysis(targetIndex, beforeFen, beforeBoard, mover, playedUci) {
@@ -2283,12 +2846,12 @@ function pgnApplyPosition() {
 }
 
 function pgnUpdateNavUI() {
-  pgnPosition.textContent = `Move ${pgnIndex} / ${pgnMoves.length}`;
+  pgnPosition.textContent = text("moveCounter", pgnIndex, pgnMoves.length);
   if (pgnIndex > 0) {
     const m = pgnMoves[pgnIndex - 1];
-    pgnLastMoveEl.textContent = `Last: ${m.raw}`;
+    pgnLastMoveEl.textContent = text("lastMove", m.raw);
   } else {
-    pgnLastMoveEl.textContent = "Start position";
+    pgnLastMoveEl.textContent = text("startPosition");
   }
   pgnPrevBtn.disabled = pgnIndex <= 0;
   pgnFirstBtn.disabled = pgnIndex <= 0;
@@ -2325,11 +2888,11 @@ pgnOverlay.addEventListener("drop", e => {
   pgnDropZone.classList.remove("is-dragging");
 });
 pgnLoadBtn.addEventListener("click", () => {
-  importPgnSource(pgnInput.value, "Pasted PGN");
+  importPgnSource(pgnInput.value, text("pastedPgn"));
 });
 pgnInput.addEventListener("paste", () => {
   setTimeout(() => {
-    if (pgnInput.value.trim()) importPgnSource(pgnInput.value, "Pasted PGN");
+    if (pgnInput.value.trim()) importPgnSource(pgnInput.value, text("pastedPgn"));
   }, 0);
 });
 pgnPathLoadBtn.addEventListener("click", loadPgnPath);
@@ -2358,7 +2921,7 @@ pgnDropZone.addEventListener("drop", e => {
   pgnDropZone.classList.remove("is-dragging");
   const file = e.dataTransfer?.files?.[0];
   if (!file) {
-    pgnStatus.textContent = "No file found in drop.";
+    pgnStatus.textContent = text("noFileDrop");
     return;
   }
   loadPgnBrowserFile(file);
@@ -2441,7 +3004,7 @@ startupSideBack.addEventListener("click", () => {
   startupSideStep.hidden = true;
 });
 
-renderProfile();
+applyLanguage();
 setOnlineMode(modeSelect.value === "online");
 renderTrainerPanel();
 
