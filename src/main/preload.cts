@@ -1,4 +1,4 @@
-// Preload script: bridges renderer → main IPC. Runs with Node access but isolated from page JS.
+// Preload script: bridges renderer -> main IPC. Runs with Node access but isolated from page JS.
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("api", {
     topmoves: args => ipcRenderer.invoke("engine:topmoves", args),
   },
   pgnFile: {
+    open: () => ipcRenderer.invoke("pgn:open-dialog"),
     readPath: path => ipcRenderer.invoke("pgn:read-path", { path }),
   },
   serverUrl: () => ipcRenderer.invoke("config:serverUrl"),

@@ -1,12 +1,12 @@
 // Electron main process: hosts the BrowserWindow and runs Pikafish for the renderer.
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
 
-const ROOT = path.resolve(__dirname, "../..");
-const CLIENT_ROOT = path.resolve(__dirname, "..");
+const ROOT = path.resolve(__dirname, "../../..");
+const RENDERER_ROOT = path.resolve(ROOT, "src/renderer");
 
 const SERVER_URL = process.env.XIANGQI_SERVER_URL || "https://xiangqi.abecomputers.ca";
 const ENGINE_TIMEOUT_MS = Number(process.env.PIKAFISH_TIMEOUT_MS || 5000);
@@ -15,12 +15,12 @@ const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
 const engineFileName = process.platform === "win32" ? "pikafish.exe" : "pikafish";
 
 function bundledPath(...parts) {
-  return app.isPackaged ? path.join(process.resourcesPath, ...parts) : path.join(ROOT, ...parts);
+  return app.isPackaged ? path.join((process as any).resourcesPath, ...parts) : path.join(ROOT, ...parts);
 }
 
 const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath(engineFileName);
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
-const engineCwd = app.isPackaged ? process.resourcesPath : ROOT;
+const engineCwd = app.isPackaged ? (process as any).resourcesPath : ROOT;
 
 function sideFromFen(fen) {
   return fen.trim().split(/\s+/)[1] || "w";
@@ -126,7 +126,7 @@ function createWindow() {
     },
   });
   win.removeMenu();
-  win.loadFile(path.join(CLIENT_ROOT, "index.html"));
+  win.loadFile(path.join(RENDERER_ROOT, "index.html"));
 }
 
 app.whenReady().then(createWindow);
@@ -147,28 +147,24 @@ ipcMain.handle("engine:status", async () => ({
   nnuePath,
 }));
 
-ipcMain.handle("engine:evaluate", async (_, args = {}) => {
+ipcMain.handle("engine:evaluate", async (_, args: any = {}) => {
   if (!args.fen) throw new Error("Missing FEN");
   return runPikafish(String(args.fen));
 });
 
-ipcMain.handle("engine:bestmove", async (_, args = {}) => {
+ipcMain.handle("engine:bestmove", async (_, args: any = {}) => {
   if (!args.fen) throw new Error("Missing FEN");
   const count = Math.max(1, Math.min(5, Number(args.count) || 1));
   return runPikafish(String(args.fen), { multipv: count });
 });
 
-ipcMain.handle("engine:topmoves", async (_, args = {}) => {
+ipcMain.handle("engine:topmoves", async (_, args: any = {}) => {
   if (!args.fen) throw new Error("Missing FEN");
   const count = Math.max(1, Math.min(5, Number(args.count) || 3));
   return runPikafish(String(args.fen), { multipv: count });
 });
 
-ipcMain.handle("pgn:read-path", async (_, args = {}) => {
-  const rawPath = String(args.path || "").trim().replace(/^['"]|['"]$/g, "");
-  if (!rawPath) throw new Error("Missing file path.");
-  const expandedPath = rawPath === "~" ? os.homedir() : rawPath.replace(/^~(?=\/|\\)/, os.homedir());
-  const filePath = path.resolve(expandedPath);
+async function readPgnFile(filePath) {
   const stat = await fs.promises.stat(filePath);
   if (!stat.isFile()) throw new Error("Path is not a file.");
   const handle = await fs.promises.open(filePath, "r");
@@ -188,6 +184,28 @@ ipcMain.handle("pgn:read-path", async (_, args = {}) => {
     text: buffer.subarray(0, bytesRead).toString("utf8"),
     truncated: stat.size > MAX_PGN_IMPORT_BYTES,
   };
+}
+
+ipcMain.handle("pgn:open-dialog", async event => {
+  const owner = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(owner, {
+    title: "Open PGN",
+    properties: ["openFile"],
+    filters: [
+      { name: "PGN files", extensions: ["pgn"] },
+      { name: "Text files", extensions: ["txt"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return readPgnFile(result.filePaths[0]);
+});
+
+ipcMain.handle("pgn:read-path", async (_, args: any = {}) => {
+  const rawPath = String(args.path || "").trim().replace(/^['"]|['"]$/g, "");
+  if (!rawPath) throw new Error("Missing file path.");
+  const expandedPath = rawPath === "~" ? os.homedir() : rawPath.replace(/^~(?=\/|\\)/, os.homedir());
+  return readPgnFile(path.resolve(expandedPath));
 });
 
 ipcMain.handle("config:serverUrl", () => SERVER_URL);

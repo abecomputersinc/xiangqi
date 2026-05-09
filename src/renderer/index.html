@@ -243,17 +243,13 @@
       <div class="overlay-content overlay-content--pgn" role="dialog" aria-modal="true" aria-labelledby="pgnTitle">
         <button id="pgnOverlayClose" class="overlay-close" type="button" aria-label="Close">×</button>
         <h2 id="pgnTitle">Import PGN</h2>
-        <p class="startup-hint">Paste PGN text, drag a PGN file here, or load from a file path.</p>
+        <p class="startup-hint">Drag a PGN file here, or open a file.</p>
         <div id="pgnDropZone" class="pgn-drop-zone">Drop PGN file here</div>
-        <textarea id="pgnInput" rows="10" placeholder="[Event &quot;...&quot;]&#10;1. C3-C4 C9-E7 2. ..."></textarea>
-        <div class="pgn-path-row">
-          <input id="pgnPathInput" type="text" placeholder="/Users/name/game.pgn" autocomplete="off" />
-          <button id="pgnPathLoadBtn" type="button">Load path</button>
-        </div>
         <div id="pgnGameList" class="pgn-game-list" hidden></div>
         <div class="button-row">
-          <button id="pgnLoadBtn" type="button">Load PGN</button>
+          <button id="pgnOpenFileBtn" type="button">Open file</button>
         </div>
+        <input id="pgnFileInput" class="visually-hidden" type="file" accept=".pgn,.txt,text/plain,application/x-chess-pgn" />
         <p id="pgnStatus" class="online-status"></p>
       </div>
     </div>
@@ -311,6 +307,6 @@
       </div>
     </div>
 
-    <script src="app.js" type="module"></script>
+    <script src="../../dist/src/renderer/app.js" type="module"></script>
   </body>
 </html>

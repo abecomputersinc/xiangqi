@@ -1,3 +1,11 @@
+export {};
+
+declare global {
+  interface Window {
+    api?: any;
+  }
+}
+
 const START_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1";
 const PIECES = {
   K: "帥",
@@ -33,12 +41,12 @@ const pieceNames = {
 };
 const GOOD_MOVE_LOSS_CP = 100;
 
-function qs(selector) {
-  return document.querySelector(selector);
+function qs<T = any>(selector: string): T {
+  return document.querySelector(selector) as T;
 }
 
-function qsa(selector) {
-  return document.querySelectorAll(selector);
+function qsa<T extends Element = any>(selector: string): NodeListOf<T> {
+  return document.querySelectorAll(selector) as NodeListOf<T>;
 }
 
 const boardEl = qs("#board");
@@ -83,12 +91,10 @@ const blackClockMove = qs("#blackClockMove");
 // PGN viewer DOM
 const pgnOverlay = qs("#pgnOverlay");
 const pgnOverlayClose = qs("#pgnOverlayClose");
-const pgnInput = qs("#pgnInput");
 const pgnDropZone = qs("#pgnDropZone");
-const pgnPathInput = qs("#pgnPathInput");
-const pgnPathLoadBtn = qs("#pgnPathLoadBtn");
+const pgnOpenFileBtn = qs<HTMLButtonElement>("#pgnOpenFileBtn");
+const pgnFileInput = qs<HTMLInputElement>("#pgnFileInput");
 const pgnGameList = qs("#pgnGameList");
-const pgnLoadBtn = qs("#pgnLoadBtn");
 const pgnStatus = qs("#pgnStatus");
 const pgnNav = qs("#pgnNav");
 const pgnFirstBtn = qs("#pgnFirstBtn");
@@ -194,10 +200,9 @@ const I18N = {
     password: "Password",
     levelEarned: "Level is earned in online matches.",
     importPgn: "Import PGN",
-    pgnImportHint: "Paste PGN text, drag a PGN file here, or load from a file path.",
+    pgnImportHint: "Drag a PGN file here, or open a file.",
     dropPgn: "Drop PGN file here",
-    loadPath: "Load path",
-    loadPgn: "Load PGN",
+    openFile: "Open file",
     onlinePlay: "Online play",
     account: "Account",
     loginFirst: "Login first",
@@ -306,11 +311,6 @@ const I18N = {
     largeFileBeginning: " Large file was read only at the beginning.",
     readFile: name => `Reading ${name}...`,
     couldNotReadFile: error => `Could not read file: ${error}`,
-    pastePath: "Paste a PGN file path first.",
-    pathDesktopOnly: "Path loading is only available in the desktop app.",
-    readingPath: "Reading PGN path...",
-    couldNotReadPath: error => `Could not read path: ${error}`,
-    pastedPgn: "Pasted PGN",
     pgnFile: "PGN file",
     loadedLarge: title => `Loaded ${title}; large file was read only at the beginning.`,
     noFileDrop: "No file found in drop.",
@@ -390,10 +390,9 @@ const I18N = {
     password: "密码",
     levelEarned: "等级通过在线对局获得。",
     importPgn: "导入 PGN",
-    pgnImportHint: "粘贴 PGN 文本、拖入 PGN 文件，或从文件路径加载。",
+    pgnImportHint: "拖入 PGN 文件，或打开文件。",
     dropPgn: "将 PGN 文件拖到这里",
-    loadPath: "加载路径",
-    loadPgn: "加载 PGN",
+    openFile: "打开文件",
     onlinePlay: "在线对弈",
     account: "账号",
     loginFirst: "请先登录",
@@ -502,11 +501,6 @@ const I18N = {
     largeFileBeginning: " 大文件仅读取了开头部分。",
     readFile: name => `正在读取 ${name}...`,
     couldNotReadFile: error => `无法读取文件：${error}`,
-    pastePath: "请先粘贴 PGN 文件路径。",
-    pathDesktopOnly: "路径加载仅在桌面应用中可用。",
-    readingPath: "正在读取 PGN 路径...",
-    couldNotReadPath: error => `无法读取路径：${error}`,
-    pastedPgn: "粘贴的 PGN",
     pgnFile: "PGN 文件",
     loadedLarge: title => `已加载 ${title}；大文件仅读取了开头部分。`,
     noFileDrop: "拖放中未找到文件。",
@@ -807,8 +801,7 @@ function applyLanguage() {
   setText("#pgnTitle", text("importPgn"));
   setText("#pgnOverlay .startup-hint", text("pgnImportHint"));
   setText("#pgnDropZone", text("dropPgn"));
-  setText("#pgnPathLoadBtn", text("loadPath"));
-  setText("#pgnLoadBtn", text("loadPgn"));
+  setText("#pgnOpenFileBtn", text("openFile"));
   setText("#onlineOverlayTitle", text("onlinePlay"));
   const onlineLabel = document.querySelector("#onlineLobby label");
   if (onlineLabel?.firstChild) onlineLabel.firstChild.textContent = `${text("account")}\n              `;
@@ -1504,7 +1497,7 @@ function triggerPreMoveAnalysis() {
   const fen = boardToFen();
   preMoveActiveFen = fen;
   if (preMoveAnalysisCache.has(fen)) return;
-  const entry = { status: "pending", moves: [] };
+  const entry: any = { status: "pending", moves: [] };
   preMoveAnalysisCache.set(fen, entry);
   enginePost("/api/topmoves", { fen, count: 5 })
     .then(result => {
@@ -1554,6 +1547,41 @@ function updateScore(score) {
   blackBar.style.width = `${blackWidth}%`;
 }
 
+function engineMoveScore(move, mover) {
+  if (!move || move.mate != null || move.score == null) return null;
+  return mover === "red" ? Number(move.score) : -Number(move.score);
+}
+
+function chooseAiMove(result, mover) {
+  const moves = result?.moves?.length
+    ? result.moves
+    : (result?.bestMove ? [{ move: result.bestMove, score: result.score, mate: result.mate }] : []);
+  const legalMoves = moves.filter(candidate => {
+    const move = uciToMove(candidate.move);
+    return move && board[move.fromR]?.[move.fromC] && colorOf(board[move.fromR][move.fromC]) === mover;
+  });
+  if (!legalMoves.length) return result?.bestMove || null;
+
+  const best = legalMoves[0];
+  if (best.mate != null) {
+    const bestMate = mover === "red" ? best.mate : -best.mate;
+    const mateMoves = legalMoves.filter(candidate => {
+      if (candidate.mate == null) return false;
+      return (mover === "red" ? candidate.mate : -candidate.mate) === bestMate;
+    });
+    return mateMoves[Math.floor(Math.random() * mateMoves.length)]?.move || best.move;
+  }
+
+  const bestScore = engineMoveScore(best, mover);
+  if (bestScore == null) return best.move;
+  const closeMoves = legalMoves.filter(candidate => {
+    const score = engineMoveScore(candidate, mover);
+    return score != null && bestScore - score <= 100;
+  });
+  const candidates = closeMoves.length ? closeMoves : [best];
+  return candidates[Math.floor(Math.random() * candidates.length)]?.move || best.move;
+}
+
 // In Electron, engine work is done in the main process via IPC. In a plain browser
 // (no preload), engine calls fail — the user is expected to run the Electron client
 // for any Pikafish-backed analysis.
@@ -1592,8 +1620,8 @@ async function maybeAiMove() {
   busy = true;
   statusText.textContent = text("choosingMove");
   try {
-    const result = await enginePost("/api/bestmove", { fen: boardToFen(), depth: Number(depthInput.value) + 1 });
-    const move = uciToMove(result.bestMove);
+    const result = await enginePost("/api/topmoves", { fen: boardToFen(), depth: Number(depthInput.value) + 1, count: 5 });
+    const move = uciToMove(chooseAiMove(result, turn));
     if (move && board[move.fromR]?.[move.fromC]) {
       await makeMove(move.fromR, move.fromC, move.toR, move.toC, "engine");
     } else {
@@ -2565,8 +2593,8 @@ function iccsToUci(raw) {
   return match ? `${match[1]}${match[2]}${match[3]}${match[4]}`.toLowerCase() : null;
 }
 
-function splitPgnGames(text) {
-  const source = String(text || "").replace(/^\uFEFF/, "").trim();
+function splitPgnGames(pgnText) {
+  const source = String(pgnText || "").replace(/^\uFEFF/, "").trim();
   if (!source) return [];
   const starts = [...source.matchAll(/^\s*\[(?:Event|Game)\s+/gim)].map(match => match.index || 0);
   if (!starts.length) return [source];
@@ -2581,27 +2609,27 @@ function splitPgnGames(text) {
   return chunks.length ? chunks : [source];
 }
 
-function pgnHeaderValue(text, name) {
-  const match = String(text).match(new RegExp(`^\\s*\\[${name}\\s+"([^"]*)"\\]`, "im"));
+function pgnHeaderValue(pgnText, name) {
+  const match = String(pgnText).match(new RegExp(`^\\s*\\[${name}\\s+"([^"]*)"\\]`, "im"));
   return match?.[1]?.trim() || "";
 }
 
-function describePgnGame(text, index, sourceTitle) {
-  const event = pgnHeaderValue(text, "Event") || pgnHeaderValue(text, "Game");
-  const red = pgnHeaderValue(text, "Red") || pgnHeaderValue(text, "White");
-  const black = pgnHeaderValue(text, "Black");
-  const date = pgnHeaderValue(text, "Date");
-  const result = pgnHeaderValue(text, "Result");
-  const moves = pgnParseText(text);
+function describePgnGame(pgnText, index, sourceTitle) {
+  const event = pgnHeaderValue(pgnText, "Event") || pgnHeaderValue(pgnText, "Game");
+  const red = pgnHeaderValue(pgnText, "Red") || pgnHeaderValue(pgnText, "White");
+  const black = pgnHeaderValue(pgnText, "Black");
+  const date = pgnHeaderValue(pgnText, "Date");
+  const result = pgnHeaderValue(pgnText, "Result");
+  const moves = pgnParseText(pgnText);
   const title = event || `${sourceTitle} #${index + 1}`;
   const players = [red, black].filter(Boolean).join(" vs ");
   const details = [players, date, result, text("movesCount", moves.length)].filter(Boolean).join(" · ");
-  return { text, title, details, moves };
+  return { text: pgnText, title, details, moves };
 }
 
-function pgnParseText(text) {
+function pgnParseText(pgnText) {
   // Strip headers and comments.
-  const cleaned = String(text || "")
+  const cleaned = String(pgnText || "")
     .replace(/\[[^\]]*\]/g, " ")
     .replace(/\{[^}]*\}/g, " ")
     .replace(/;[^\n]*/g, " ")
@@ -2621,8 +2649,8 @@ function pgnParseText(text) {
   return moves;
 }
 
-function pgnLoadText(text, meta = null) {
-  const moves = pgnParseText(text);
+function pgnLoadText(pgnText, meta = null) {
+  const moves = pgnParseText(pgnText);
   if (!moves.length) {
     pgnStatus.textContent = text("noMovesFound");
     return false;
@@ -2666,16 +2694,15 @@ function renderPgnGameList(sourceTitle, truncated = false) {
 function openPgnImportGame(index) {
   const game = pgnImportGames[index];
   if (!game) return;
-  pgnInput.value = game.text;
   if (pgnLoadText(game.text, { title: game.title })) {
     clearPgnGameList();
     closePgnOverlay();
   }
 }
 
-async function importPgnSource(text, title, truncated = false, { autoLoadSingle = true } = {}) {
+async function importPgnSource(pgnText, title, truncated = false, { autoLoadSingle = true } = {}) {
   clearPgnGameList();
-  const chunks = splitPgnGames(text);
+  const chunks = splitPgnGames(pgnText);
   const games = chunks
     .map((chunk, index) => describePgnGame(chunk, index, title))
     .filter(game => game.moves.length);
@@ -2684,7 +2711,6 @@ async function importPgnSource(text, title, truncated = false, { autoLoadSingle 
     return;
   }
   if (games.length === 1 && autoLoadSingle) {
-    pgnInput.value = games[0].text;
     if (pgnLoadText(games[0].text, { title: games[0].title })) {
       if (truncated) {
         pgnStatus.textContent = text("loadedLarge", games[0].title);
@@ -2694,41 +2720,35 @@ async function importPgnSource(text, title, truncated = false, { autoLoadSingle 
     return;
   }
   pgnImportGames = games;
-  pgnInput.value = games[0].text;
   renderPgnGameList(title, truncated);
 }
 
 async function loadPgnBrowserFile(file) {
   if (!file) return;
-  pgnStatus.textContent = text("readFile", file.name);
+    pgnStatus.textContent = text("readFile", file.name);
   try {
     const truncated = file.size > MAX_PGN_IMPORT_BYTES;
-    const text = await file.slice(0, MAX_PGN_IMPORT_BYTES).text();
-    await importPgnSource(text, file.name || text("pgnFile"), truncated);
+    const pgnText = await file.slice(0, MAX_PGN_IMPORT_BYTES).text();
+    await importPgnSource(pgnText, file.name || text("pgnFile"), truncated);
   } catch (e) {
     pgnStatus.textContent = text("couldNotReadFile", e.message);
   }
 }
 
-async function loadPgnPath() {
-  const filePath = String(pgnPathInput.value || "").trim();
-  if (!filePath) {
-    pgnStatus.textContent = text("pastePath");
+async function openPgnFile() {
+  if (!window.api?.pgnFile?.open) {
+    pgnFileInput.click();
     return;
   }
-  if (!window.api?.pgnFile?.readPath) {
-    pgnStatus.textContent = text("pathDesktopOnly");
-    return;
-  }
-  pgnPathLoadBtn.disabled = true;
-  pgnStatus.textContent = text("readingPath");
+  pgnOpenFileBtn.disabled = true;
   try {
-    const result = await window.api.pgnFile.readPath(filePath);
+    const result = await window.api.pgnFile.open();
+    if (!result) return;
     await importPgnSource(String(result?.text || ""), result?.name || text("pgnFile"), Boolean(result?.truncated));
   } catch (e) {
-    pgnStatus.textContent = text("couldNotReadPath", e.message);
+    pgnStatus.textContent = text("couldNotReadFile", e.message);
   } finally {
-    pgnPathLoadBtn.disabled = false;
+    pgnOpenFileBtn.disabled = false;
   }
 }
 
@@ -2756,7 +2776,7 @@ function pgnRenderAnalysis() {
 
 async function pgnComputeAnalysis(targetIndex, beforeFen, beforeBoard, mover, playedUci) {
   if (pgnAnalysisCache.has(targetIndex)) return;
-  const entry = { status: "pending", lines: [] };
+  const entry: any = { status: "pending", lines: [] };
   pgnAnalysisCache.set(targetIndex, entry);
   try {
     const result = await enginePost("/api/topmoves", { fen: beforeFen, depth: Number(depthInput.value) + 1, count: 5 });
@@ -2860,7 +2880,7 @@ function openPgnOverlay() {
   pgnOverlay.hidden = false;
   pgnStatus.textContent = "";
   clearPgnGameList();
-  setTimeout(() => pgnInput.focus(), 30);
+  setTimeout(() => pgnOpenFileBtn.focus(), 30);
 }
 
 function closePgnOverlay() {
@@ -2875,29 +2895,15 @@ pgnOverlay.addEventListener("dragover", e => {
   e.preventDefault();
 });
 pgnOverlay.addEventListener("drop", e => {
-  if (e.target === pgnDropZone || pgnDropZone.contains(e.target)) return;
+  if (e.target === pgnDropZone || pgnDropZone.contains(e.target as Node)) return;
   e.preventDefault();
   pgnDropZone.classList.remove("is-dragging");
 });
-pgnLoadBtn.addEventListener("click", () => {
-  importPgnSource(pgnInput.value, text("pastedPgn"));
-});
-pgnInput.addEventListener("paste", () => {
-  setTimeout(() => {
-    if (pgnInput.value.trim()) importPgnSource(pgnInput.value, text("pastedPgn"));
-  }, 0);
-});
-pgnPathLoadBtn.addEventListener("click", loadPgnPath);
-pgnPathInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    loadPgnPath();
-  }
-});
-pgnPathInput.addEventListener("paste", () => {
-  setTimeout(() => {
-    if (pgnPathInput.value.trim()) loadPgnPath();
-  }, 0);
+pgnOpenFileBtn.addEventListener("click", openPgnFile);
+pgnFileInput.addEventListener("change", () => {
+  const file = pgnFileInput.files?.[0];
+  pgnFileInput.value = "";
+  if (file) loadPgnBrowserFile(file);
 });
 pgnDropZone.addEventListener("dragover", e => {
   e.preventDefault();
@@ -2919,7 +2925,7 @@ pgnDropZone.addEventListener("drop", e => {
   loadPgnBrowserFile(file);
 });
 pgnGameList.addEventListener("click", e => {
-  const btn = (e.target)?.closest(".pgn-game-option");
+  const btn = (e.target as HTMLElement | null)?.closest(".pgn-game-option") as HTMLElement | null;
   if (!btn?.dataset.index) return;
   openPgnImportGame(Number(btn.dataset.index));
 });
@@ -2931,7 +2937,7 @@ pgnImportAgain.addEventListener("click", openPgnOverlay);
 
 window.addEventListener("keydown", e => {
   if (modeSelect.value !== "pgn" || pgnNav.hidden) return;
-  const target = e.target;
+  const target = e.target as HTMLElement | null;
   if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
   if (e.key === "ArrowLeft") { e.preventDefault(); pgnGoto(pgnIndex - 1); }
   if (e.key === "ArrowRight") { e.preventDefault(); pgnGoto(pgnIndex + 1); }

@@ -24,20 +24,21 @@ Use it when you want to:
 ## Project Structure
 
 ```text
-client/
-  index.html
-  app.ts             # TypeScript renderer source
-  app.js             # generated renderer bundle loaded by index.html
-  styles.css
-  electron/
-    main.cjs
-    preload.cjs
+src/
+  main/
+    main.cts         # TypeScript Electron main process source
+    preload.cts      # TypeScript Electron preload source
+  renderer/
+    index.html
+    app.ts           # TypeScript renderer source
+    styles.css
+dist/                # generated JavaScript output, ignored by git
 tsconfig.json
 ../xiangqiserver/
   server.js          # standalone auth/match relay server
 ```
 
-The client app runs in Electron. The renderer is authored in TypeScript and compiled to `client/app.js` before app startup/build. The server lives next to this repository in `../xiangqiserver` and is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
+The client app runs in Electron. Renderer, main process, preload, and packaging hook code are authored in TypeScript and compiled to ignored `dist/` output before app startup/build. The server lives next to this repository in `../xiangqiserver` and is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
 
 ## Requirements
 
@@ -81,7 +82,7 @@ Start the Electron client:
 npm start
 ```
 
-`npm start` compiles `client/app.ts` first, then opens Electron.
+`npm start` compiles the TypeScript sources first, then opens Electron.
 
 By default the Electron app points to:
 
@@ -211,7 +212,7 @@ Do not commit real production user data.
 
 ## PGN Replay
 
-PGN mode reads user-provided game files directly. Users can paste PGN text, drag a PGN file into the import panel, or load a pasted file path. Single-game PGNs import automatically; `.pgns` and other multi-game PGN files show a selectable game list.
+PGN mode reads user-provided game files directly. Users can drag a PGN file into the import panel or choose one with Open file. Single-game PGNs import automatically; `.pgns` and other multi-game PGN files show a selectable game list.
 
 ## Deployment
 
@@ -234,11 +235,11 @@ Open TCP port `4173` in both the VM firewall and cloud security rules.
 ## Useful Commands
 
 ```sh
-npm run check:client
-npm run build:client
-node --check client/app.js
-node --check client/electron/main.cjs
-node --check client/electron/preload.cjs
+npm run check
+npm run build
+node --check dist/src/renderer/app.js
+node --check dist/src/main/main.cjs
+node --check dist/src/main/preload.cjs
 node --check ../xiangqiserver/server.js
 npm run dist:mac
 npm run dist:mac:arm64
