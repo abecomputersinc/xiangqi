@@ -8,7 +8,7 @@ const { spawn } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "../..");
 const CLIENT_ROOT = path.resolve(__dirname, "..");
 
-const SERVER_URL = process.env.XIANGQI_SERVER_URL || "http://129.153.61.43:4173";
+const SERVER_URL = process.env.XIANGQI_SERVER_URL || "https://xiangqi.abecomputers.ca";
 const ENGINE_TIMEOUT_MS = Number(process.env.PIKAFISH_TIMEOUT_MS || 5000);
 const ENGINE_MOVETIME_MS = Number(process.env.PIKAFISH_MOVETIME_MS || 500);
 const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;

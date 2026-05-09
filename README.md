@@ -32,12 +32,12 @@ client/
   electron/
     main.cjs
     preload.cjs
-server/
-  server.js
 tsconfig.json
+../xiangqiserver/
+  server.js          # standalone auth/match relay server
 ```
 
-The client app runs in Electron. The renderer is authored in TypeScript and compiled to `client/app.js` before app startup/build. The server is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
+The client app runs in Electron. The renderer is authored in TypeScript and compiled to `client/app.js` before app startup/build. The server lives next to this repository in `../xiangqiserver` and is a lightweight Node HTTP service for auth, levels, presence, and online match relay.
 
 ## Requirements
 
@@ -86,7 +86,7 @@ npm start
 By default the Electron app points to:
 
 ```text
-http://129.153.61.43:4173
+https://xiangqi.abecomputers.ca
 ```
 
 Use a different server URL when needed:
@@ -204,7 +204,7 @@ The server exposes:
 User data is stored as JSON by the server under:
 
 ```text
-server/data/users.json
+../xiangqiserver/data/users.json
 ```
 
 Do not commit real production user data.
@@ -215,7 +215,7 @@ PGN mode reads user-provided game files directly. Users can paste PGN text, drag
 
 ## Deployment
 
-Deploy only the server folder and a minimal package file to your host. The server has no runtime dependencies beyond Node built-ins.
+Deploy the `xiangqiserver` folder to your host. The server has no runtime dependencies beyond Node built-ins.
 
 Example systemd environment:
 
@@ -225,7 +225,7 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/xiangqi-server
 Environment=HOST=0.0.0.0
 Environment=PORT=4173
-ExecStart=/usr/bin/node /home/ubuntu/xiangqi-server/server/server.js
+ExecStart=/usr/bin/node /home/ubuntu/xiangqi-server/server.js
 Restart=always
 ```
 
@@ -239,7 +239,7 @@ npm run build:client
 node --check client/app.js
 node --check client/electron/main.cjs
 node --check client/electron/preload.cjs
-node --check server/server.js
+node --check ../xiangqiserver/server.js
 npm run dist:mac
 npm run dist:mac:arm64
 npm run dist:linux
@@ -251,7 +251,7 @@ npm run dist:win
 Before publishing to GitHub:
 
 - Do not commit private keys, tokens, or deployment credentials.
-- Do not commit production `server/data/users.json`.
+- Do not commit production `../xiangqiserver/data/users.json`.
 - Windows/Linux/macOS release artifacts include third-party Pikafish engine and NNUE files.
 - Release artifacts are not licensed as a single all-GPL package; bundled third-party components keep their own license terms.
 - The bundled `pikafish.nnue` weights are not for commercial use without permission from the rightsholder.

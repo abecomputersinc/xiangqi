@@ -11,7 +11,7 @@
   "type": "module",
   "main": "client/electron/main.cjs",
   "scripts": {
-    "server": "node server/server.js",
+    "server": "node ../xiangqiserver/server.js",
     "build:client": "tsc --project tsconfig.json",
     "check:client": "tsc --project tsconfig.json --noEmit",
     "dist:mac": "npm run build:client && electron-builder --mac dmg zip --publish never",
