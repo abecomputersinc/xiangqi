@@ -50,6 +50,7 @@ function qsa<T extends Element = any>(selector: string): NodeListOf<T> {
 }
 
 const boardEl = qs("#board");
+const matePatternToast = qs("#matePatternToast");
 const statusText = qs("#statusText");
 const turnPill = qs("#turnPill");
 const modeSelect = qs("#modeSelect");
@@ -129,6 +130,11 @@ const loginName = qs("#loginName");
 const loginPassword = qs("#loginPassword");
 const loginStatus = qs("#loginStatus");
 const signupBtn = qs("#signupBtn");
+const gameEndOverlay = qs("#gameEndOverlay");
+const gameEndResult = qs("#gameEndResult");
+const gameEndPattern = qs("#gameEndPattern");
+const gameEndNewBtn = qs("#gameEndNewBtn");
+const gameEndReviewBtn = qs("#gameEndReviewBtn");
 
 const I18N = {
   en: {
@@ -203,6 +209,11 @@ const I18N = {
     pgnImportHint: "Drag a PGN file here, or open a file.",
     dropPgn: "Drop PGN file here",
     openFile: "Open file",
+    gameOver: "Game over",
+    analyzePgn: "Analyze PGN",
+    finishedGame: "Finished game",
+    noCheckmatePattern: "not a checkmate finish",
+    unknownMatePattern: "unidentified checkmate",
     onlinePlay: "Online play",
     account: "Account",
     loginFirst: "Login first",
@@ -274,7 +285,13 @@ const I18N = {
     unknownEnginePath: path => `Unknown engine path: ${path}`,
     moveNotSent: error => `Move not sent: ${error}`,
     onlineNewGame: "Use the room controls to start a new online game.",
-    undoOnline: "Undo isn't available in online play.",
+    undoOnline: "Undo requested. Waiting for opponent...",
+    undoNoMoves: "No moves to undo.",
+    undoRequestedByOpponent: name => `${name} requests to undo the last move. Allow it?`,
+    undoIncoming: name => `${name} requested an undo.`,
+    undoDeclined: "Undo declined.",
+    undoAccepted: "Undo accepted.",
+    undoRequestSent: "Undo request sent. Waiting for opponent...",
     undoTrainer: "Undo is disabled during scored training.",
     outOfSync: "Got an out-of-sync move from opponent. Reload to resync.",
     requestFailed: status => `Request failed (${status})`,
@@ -393,6 +410,11 @@ const I18N = {
     pgnImportHint: "拖入 PGN 文件，或打开文件。",
     dropPgn: "将 PGN 文件拖到这里",
     openFile: "打开文件",
+    gameOver: "对局结束",
+    analyzePgn: "棋谱分析",
+    finishedGame: "已结束棋局",
+    noCheckmatePattern: "非将死结束",
+    unknownMatePattern: "未识别杀法",
     onlinePlay: "在线对弈",
     account: "账号",
     loginFirst: "请先登录",
@@ -464,7 +486,13 @@ const I18N = {
     unknownEnginePath: path => `未知引擎路径：${path}`,
     moveNotSent: error => `走法未发送：${error}`,
     onlineNewGame: "请使用房间控件开始新的在线对局。",
-    undoOnline: "在线对局不能悔棋。",
+    undoOnline: "已请求悔棋，等待对手同意...",
+    undoNoMoves: "没有可悔的走法。",
+    undoRequestedByOpponent: name => `${name} 请求悔棋一步，是否同意？`,
+    undoIncoming: name => `${name} 请求悔棋。`,
+    undoDeclined: "对方不同意悔棋。",
+    undoAccepted: "已同意悔棋。",
+    undoRequestSent: "已发送悔棋请求，等待对手同意...",
     undoTrainer: "评分训练中不能悔棋。",
     outOfSync: "收到不同步的对手走法。请重新加载以同步。",
     requestFailed: status => `请求失败（${status}）`,
@@ -514,6 +542,43 @@ const I18N = {
 };
 
 let lang = loadLanguage();
+let gameEndOverlayTimer = null;
+const GAME_END_OVERLAY_DELAY_MS = 3000;
+const SOUND_FILES = {
+  move: "../../sound/Move.mp3",
+  capture: "../../sound/Capture.mp3",
+  check: "../../sound/Check.mp3",
+  end: "../../sound/End.mp3",
+};
+const fallbackSounds = {
+  end: "check",
+};
+const soundPlayers = new Map();
+
+function getSoundPlayer(kind) {
+  if (soundPlayers.has(kind)) return soundPlayers.get(kind);
+  const audio = new Audio(SOUND_FILES[kind] || SOUND_FILES.move);
+  audio.preload = "auto";
+  audio.volume = 0.8;
+  soundPlayers.set(kind, audio);
+  return audio;
+}
+
+function unlockAudio() {
+  for (const kind of ["move", "capture", "check"]) getSoundPlayer(kind).load();
+}
+
+function playSound(kind) {
+  const audio = getSoundPlayer(kind);
+  audio.currentTime = 0;
+  audio.play().catch(() => {
+    const fallback = fallbackSounds[kind];
+    if (fallback) playSound(fallback);
+  });
+}
+
+window.addEventListener("pointerdown", unlockAudio, { once: true });
+window.addEventListener("keydown", unlockAudio, { once: true });
 
 function loadLanguage() {
   try {
@@ -592,7 +657,7 @@ let trainerState = {
 let currentProfile = loadProfile();
 
 // Online multiplayer state. null when offline.
-// Shape: { code, playerId, role, myColor, status, winner, winReason, players, spectators, eventSource, applyingRemote }
+// Shape: { code, playerId, role, myColor, status, winner, winReason, players, spectators, eventSource, applyingRemote, undoRequest }
 let online = null;
 
 function levelLabel(level, points = 0) {
@@ -753,10 +818,6 @@ function applyLanguage() {
   if (controlsLabels[1]?.firstChild) controlsLabels[1].firstChild.textContent = `${text("youPlay")} `;
   if (controlsLabels[2]?.firstChild) controlsLabels[2].firstChild.textContent = `${text("engineDepth")} `;
   setText("#newGameBtn", text("newGame"));
-  setText(".score-head span", text("realtimeScore"));
-  const scoreLabels = qsa(".score-labels span");
-  if (scoreLabels[0]) scoreLabels[0].textContent = text("black");
-  if (scoreLabels[1]) scoreLabels[1].textContent = text("red");
   setText(".analysis h2", text("moveAnalysis"));
   setText(".history h2", text("moves"));
   setText("#undoBtn", text("undo"));
@@ -798,6 +859,9 @@ function applyLanguage() {
   setAttr("#loginPassword", "placeholder", text("password"));
   setText("#loginSaveBtn", text("login"));
   setText("#signupBtn", text("signup"));
+  setText("#gameEndTitle", text("gameOver"));
+  setText("#gameEndNewBtn", text("newGame"));
+  setText("#gameEndReviewBtn", text("analyzePgn"));
   setText("#pgnTitle", text("importPgn"));
   setText("#pgnOverlay .startup-hint", text("pgnImportHint"));
   setText("#pgnDropZone", text("dropPgn"));
@@ -980,6 +1044,16 @@ function isInCheck(color, targetBoard = board) {
     }
   }
   return false;
+}
+
+function findKing(color, targetBoard = board) {
+  for (let r = 0; r < 10; r += 1) {
+    for (let c = 0; c < 9; c += 1) {
+      const piece = targetBoard[r][c];
+      if (piece?.toLowerCase() === "k" && colorOf(piece) === color) return { r, c };
+    }
+  }
+  return null;
 }
 
 function legalMoves(r, c) {
@@ -1192,6 +1266,7 @@ function canHumanMove() {
   if (modeSelect.value === "pgn") return false;
   if (modeSelect.value === "online") {
     if (!online || online.role !== "player" || online.status !== "playing") return false;
+    if (online.undoRequest) return false;
     return online.myColor === turn;
   }
   if (modeSelect.value === "human") return true;
@@ -1342,6 +1417,7 @@ function clockTimeout(loser) {
     gameResult = { winner, reason: "timeout" };
     busy = true;
     statusText.textContent = text("flagged", loser, winner);
+    showGameEndOverlay(gameResult, statusText.textContent);
   }
 }
 
@@ -1356,6 +1432,7 @@ function applyMove(fromR, fromC, toR, toC, source) {
   selected = null;
   legalTargets = [];
   clockOnTurnChanged();
+  playSound(isInCheck(turn) ? "check" : (captured ? "capture" : "move"));
 }
 
 async function makeMove(fromR, fromC, toR, toC, source = "human") {
@@ -1423,11 +1500,149 @@ function announceLocalEnd(ending) {
   gameResult = ending;
   busy = true;
   stopClock();
-  const message = text("winsBy", ending.winner, ending.reason);
+  const message = gameResultMessage(ending);
   statusText.textContent = message;
   turnPill.textContent = message;
   turnPill.classList.add("winner");
   turnPill.classList.toggle("black", ending.winner === "black");
+  showGameEndOverlay(ending, message);
+}
+
+function gameResultMessage(result) {
+  if (!result) return "";
+  if (result.winner === "draw") return text("drawBy", result.reason);
+  return text("winsBy", result.winner, result.reason);
+}
+
+function piecesBetween(a, b, targetBoard = board) {
+  if (a.r !== b.r && a.c !== b.c) return [];
+  const dr = Math.sign(b.r - a.r);
+  const dc = Math.sign(b.c - a.c);
+  const pieces = [];
+  for (let r = a.r + dr, c = a.c + dc; r !== b.r || c !== b.c; r += dr, c += dc) {
+    const piece = targetBoard[r][c];
+    if (piece) pieces.push({ r, c, piece });
+  }
+  return pieces;
+}
+
+function attackingPiecesToKing(loser, targetBoard = board) {
+  const king = findKing(loser, targetBoard);
+  if (!king) return [];
+  const attacker = loser === "red" ? "black" : "red";
+  const attackers = [];
+  for (let r = 0; r < 10; r += 1) {
+    for (let c = 0; c < 9; c += 1) {
+      const piece = targetBoard[r][c];
+      if (colorOf(piece) !== attacker) continue;
+      if (pseudoMoves(r, c, targetBoard).some(move => move.r === king.r && move.c === king.c)) {
+        attackers.push({ r, c, piece, kind: piece.toLowerCase() });
+      }
+    }
+  }
+  return attackers;
+}
+
+function horseMatePattern(horse, loser) {
+  const king = findKing(loser);
+  if (!king) return "马杀";
+  const file = squareToUci(horse.r, horse.c)[0];
+  const rankFromLoser = loser === "black" ? horse.r + 1 : 10 - horse.r;
+  if ((file === "c" || file === "g") && rankFromLoser === 2) return "卧槽马";
+  if ((file === "d" || file === "f") && rankFromLoser === 2) return "挂角马";
+  if ((file === "c" || file === "g") && rankFromLoser === 3) return "钓鱼马";
+  if ((file === "c" || file === "g") && rankFromLoser === 4) return "侧面虎 / 高钓马";
+  return "马杀";
+}
+
+function detectMatePattern(result = gameResult) {
+  if (!result || result.winner === "draw" || result.reason !== "checkmate") return text("noCheckmatePattern");
+  const loser = result.winner === "red" ? "black" : "red";
+  const king = findKing(loser);
+  if (!king) return text("unknownMatePattern");
+  const attackers = attackingPiecesToKing(loser);
+  const last = history.at(-1);
+  const lastKind = last?.piece?.toLowerCase();
+
+  if (kingsFacing(board)) return "对面笑 / 白脸将";
+
+  const cannonAttackers = attackers.filter(piece => piece.kind === "c");
+  for (const cannon of cannonAttackers) {
+    const screens = piecesBetween(cannon, king);
+    if (screens.length === 1 && screens[0].piece.toLowerCase() === "n" && colorOf(screens[0].piece) === result.winner) {
+      return "马后炮";
+    }
+  }
+  if (cannonAttackers.length >= 2) return "重炮 / 叠炮 / 双炮";
+  if (cannonAttackers.length) {
+    const sameFileCannons = [];
+    for (let r = 0; r < 10; r += 1) {
+      const piece = board[r][king.c];
+      if (piece?.toLowerCase() === "c" && colorOf(piece) === result.winner) sameFileCannons.push(piece);
+    }
+    if (sameFileCannons.length >= 2) return "重炮 / 叠炮 / 双炮";
+    if (lastKind === "c") return "空头炮";
+    return "炮杀";
+  }
+
+  const rookAttackers = attackers.filter(piece => piece.kind === "r");
+  if (rookAttackers.length >= 2) return "双车错 / 长短车";
+  if (rookAttackers.length && lastKind === "r") {
+    if (last?.toR === (loser === "black" ? 0 : 9)) return "海底捞月 / 沉底月";
+    if (last?.toC === 4 && last?.captured?.toLowerCase() === "a") return "大胆穿心 / 大刀剜心";
+    return "车杀";
+  }
+
+  const horseAttackers = attackers.filter(piece => piece.kind === "n");
+  if (horseAttackers.length >= 2) return "双马饮泉";
+  if (horseAttackers.length) return horseMatePattern(horseAttackers[0], loser);
+
+  const pawnAttackers = attackers.filter(piece => piece.kind === "p");
+  if (pawnAttackers.length >= 2) return "二鬼拍门";
+  if (pawnAttackers.length && lastKind === "p") return "老兵搜山 / 老卒搜山";
+
+  const palacePieces = [[0, 3], [0, 5], [1, 4], [2, 3], [2, 5], [7, 3], [7, 5], [8, 4], [9, 3], [9, 5]]
+    .filter(([r, c]) => palace(loser, r, c) && colorOf(board[r][c]) === loser)
+    .length;
+  if (palacePieces >= 2) return "闷杀 / 闷宫";
+  return text("unknownMatePattern");
+}
+
+function showGameEndOverlay(result = gameResult, message = gameResultMessage(result)) {
+  if (!result || !history.length || modeSelect.value === "pgn") return;
+  const wasHidden = gameEndOverlay.hidden;
+  const pattern = detectMatePattern(result);
+  gameEndResult.textContent = message;
+  gameEndPattern.textContent = pattern;
+  matePatternToast.textContent = pattern;
+  matePatternToast.hidden = false;
+  if (wasHidden) playSound("end");
+  if (!wasHidden || gameEndOverlayTimer) return;
+  gameEndOverlayTimer = setTimeout(() => {
+    matePatternToast.hidden = true;
+    gameEndOverlay.hidden = false;
+    gameEndOverlayTimer = null;
+  }, GAME_END_OVERLAY_DELAY_MS);
+}
+
+function closeGameEndOverlay() {
+  if (gameEndOverlayTimer) {
+    clearTimeout(gameEndOverlayTimer);
+    gameEndOverlayTimer = null;
+  }
+  matePatternToast.hidden = true;
+  matePatternToast.textContent = "";
+  gameEndOverlay.hidden = true;
+}
+
+async function reviewFinishedGame() {
+  if (!history.length) return;
+  const pgn = buildPgn();
+  closeGameEndOverlay();
+  closeMatchOverlay();
+  modeSelect.value = "pgn";
+  modeSelect.dispatchEvent(new Event("change"));
+  await importPgnSource(pgn, text("finishedGame"));
 }
 
 function moverScore(score, mover) {
@@ -1541,16 +1756,18 @@ function updateScore(score) {
   currentEval = score ?? currentEval;
   evalText.textContent = formatScore(score);
   const clamped = Math.max(-600, Math.min(600, score ?? 0));
-  const redWidth = 50 + (clamped / 600) * 50;
-  const blackWidth = 100 - redWidth;
-  redBar.style.width = `${redWidth}%`;
-  blackBar.style.width = `${blackWidth}%`;
+  const redHeight = 50 + (clamped / 600) * 50;
+  const blackHeight = 100 - redHeight;
+  redBar.style.height = `${redHeight}%`;
+  blackBar.style.height = `${blackHeight}%`;
 }
 
 function engineMoveScore(move, mover) {
   if (!move || move.mate != null || move.score == null) return null;
   return mover === "red" ? Number(move.score) : -Number(move.score);
 }
+
+const AI_MIN_RANDOM_SCORE_CP = -100;
 
 function chooseAiMove(result, mover) {
   const moves = result?.moves?.length
@@ -1576,7 +1793,7 @@ function chooseAiMove(result, mover) {
   if (bestScore == null) return best.move;
   const closeMoves = legalMoves.filter(candidate => {
     const score = engineMoveScore(candidate, mover);
-    return score != null && bestScore - score <= 100;
+    return score != null && score >= AI_MIN_RANDOM_SCORE_CP && bestScore - score <= 100;
   });
   const candidates = closeMoves.length ? closeMoves : [best];
   return candidates[Math.floor(Math.random() * candidates.length)]?.move || best.move;
@@ -1814,9 +2031,9 @@ async function trainerMaybeOpponentMove() {
   let failed = false;
   let ended = false;
   try {
-    const result = await enginePost("/api/bestmove", { fen, depth: Number(depthInput.value) + 1 });
+    const result = await enginePost("/api/topmoves", { fen, depth: Number(depthInput.value) + 1, count: 5 });
     if (modeSelect.value !== "trainer" || fen !== boardToFen()) return;
-    const move = uciToMove(result.bestMove);
+    const move = uciToMove(chooseAiMove(result, turn));
     if (!isLegalParsedMove(move)) throw new Error(text("noLegalReply"));
     applyMove(move.fromR, move.fromC, move.toR, move.toC, "engine");
     renderBoard();
@@ -1951,6 +2168,7 @@ function resetGameLocal() {
   history = [];
   lastMove = null;
   gameResult = null;
+  closeGameEndOverlay();
   lastUserRecommendationText = "";
   currentEval = 0;
   busy = false;
@@ -1985,7 +2203,7 @@ function resetGame() {
 
 function undo() {
   if (modeSelect.value === "online") {
-    onlineMatchStatus.textContent = text("undoOnline");
+    onlineRequestUndo();
     return;
   }
   if (modeSelect.value === "trainer") {
@@ -2009,6 +2227,33 @@ function undo() {
   renderBoard();
   renderHistory();
   evaluatePosition();
+}
+
+function undoLastMoveLocal(fen = "") {
+  if (fen) {
+    const savedOnline = online;
+    loadFen(fen);
+    online = savedOnline;
+  } else {
+    const record = history.pop();
+    if (!record) return false;
+    board[record.fromR][record.fromC] = record.piece;
+    board[record.toR][record.toC] = record.captured;
+    turn = record.side;
+    lastMove = history.at(-1) || null;
+    selected = null;
+    legalTargets = [];
+    gameResult = null;
+    renderBoard();
+    renderHistory();
+    evaluatePosition();
+  }
+  if (modeSelect.value === "online" && online?.status === "playing") {
+    stopClock();
+    startClock();
+    triggerPreMoveAnalysis();
+  }
+  return true;
 }
 
 // Resolve the match-relay base URL (used only for online play). Engine calls go via IPC.
@@ -2213,6 +2458,7 @@ function enterRoom(info) {
     spectators: info.match?.spectators || [],
     eventSource: null,
     rematchVotes: info.match?.rematchVotes || [],
+    undoRequest: info.match?.undoRequest || null,
     ranked: !!info.match?.ranked,
   };
   resetGameLocal();
@@ -2253,6 +2499,9 @@ async function openEventStream() {
   es.addEventListener("joined", () => onlineHandleJoined());
   es.addEventListener("left", () => onlineHandleLeft());
   es.addEventListener("move", e => onlineHandleMove(JSON.parse(e.data)));
+  es.addEventListener("undo_requested", e => onlineHandleUndoRequested(JSON.parse(e.data)));
+  es.addEventListener("undo_accepted", e => onlineHandleUndoAccepted(JSON.parse(e.data)));
+  es.addEventListener("undo_rejected", e => onlineHandleUndoRejected(JSON.parse(e.data)));
   es.addEventListener("rematch_voted", e => onlineHandleRematchVote(JSON.parse(e.data)));
   es.addEventListener("rematch_started", e => onlineHandleRematchStarted(JSON.parse(e.data)));
   es.addEventListener("gameover", e => onlineHandleGameOver(JSON.parse(e.data)));
@@ -2283,6 +2532,7 @@ function applyMatchSnapshot(match) {
   online.winReason = match.state.winReason;
   online.ranked = !!match.ranked;
   online.rematchVotes = match.rematchVotes || [];
+  online.undoRequest = match.undoRequest || null;
   const me = match.players.find(p => p.id === online.playerId) || match.spectators.find(s => s.id === online.playerId);
   if (me) {
     online.role = match.players.includes(me) ? "player" : "spectator";
@@ -2319,6 +2569,45 @@ function onlineHandleMove(data) {
   applyRemoteMove(data.uci);
 }
 
+async function onlineHandleUndoRequested(data) {
+  if (!online) return;
+  online.undoRequest = data;
+  const requester = online.players.find(p => p.id === data.by);
+  const name = requester?.nickname || colorLabel(data.color);
+  if (data.by === online.playerId) {
+    onlineMatchStatus.textContent = text("undoRequestSent");
+    return;
+  }
+  onlineMatchStatus.textContent = text("undoIncoming", name);
+  if (online.role !== "player" || online.status !== "playing") return;
+  const accepted = confirm(text("undoRequestedByOpponent", name));
+  try {
+    await postJson(`/api/match/${encodeURIComponent(online.code)}/undo`, {
+      playerId: online.playerId,
+      requestId: data.id,
+      decision: accepted ? "accept" : "reject",
+    });
+  } catch (e) {
+    onlineMatchStatus.textContent = e.message;
+  }
+}
+
+function onlineHandleUndoAccepted(data) {
+  if (!online) return;
+  online.undoRequest = null;
+  undoLastMoveLocal(data.fen || "");
+  renderOnlineMatch();
+  onlineMatchStatus.textContent = text("undoAccepted");
+}
+
+function onlineHandleUndoRejected(data) {
+  if (!online) return;
+  online.undoRequest = null;
+  void data;
+  renderOnlineMatch();
+  onlineMatchStatus.textContent = text("undoDeclined");
+}
+
 function onlineHandleRematchVote(data) {
   // The vote count appears on the Rematch button; nothing to do here.
   void data;
@@ -2347,6 +2636,7 @@ function onlineHandleGameOver(data) {
   }
   stopClock();
   renderOnlineMatch();
+  showGameEndOverlay(gameResult, describeOutcome(data.winner, data.reason));
 }
 
 function describeOutcome(winner, reason) {
@@ -2359,6 +2649,20 @@ async function onlineSendMove(uci, fen) {
   await postJson(`/api/match/${encodeURIComponent(online.code)}/move`, { playerId: online.playerId, uci, fen });
 }
 
+async function onlineRequestUndo() {
+  if (!online || online.role !== "player" || online.status !== "playing") return;
+  if (history.length === 0) {
+    onlineMatchStatus.textContent = text("undoNoMoves");
+    return;
+  }
+  try {
+    await postJson(`/api/match/${encodeURIComponent(online.code)}/undo`, { playerId: online.playerId });
+    onlineMatchStatus.textContent = text("undoOnline");
+  } catch (e) {
+    onlineMatchStatus.textContent = e.message;
+  }
+}
+
 async function onlineDeclareGameOver(winner, reason) {
   if (!online) return;
   online.status = "finished";
@@ -2366,6 +2670,7 @@ async function onlineDeclareGameOver(winner, reason) {
   online.winReason = reason;
   gameResult = { winner, reason };
   renderOnlineMatch();
+  showGameEndOverlay(gameResult, describeOutcome(winner, reason));
   await postJson(`/api/match/${encodeURIComponent(online.code)}/gameover`, { playerId: online.playerId, winner, reason });
 }
 
@@ -2421,7 +2726,11 @@ function renderOnlineMatch() {
   let status = "";
   if (online.status === "waiting") status = text("waitingOpponentShare", online.code);
   else if (online.status === "playing") {
-    if (online.role === "spectator") status = text("colorToMove", turn);
+    if (online.undoRequest) {
+      const requester = online.players.find(p => p.id === online.undoRequest.by);
+      const name = requester?.nickname || colorLabel(online.undoRequest.color);
+      status = online.undoRequest.by === online.playerId ? text("undoRequestSent") : text("undoIncoming", name);
+    } else if (online.role === "spectator") status = text("colorToMove", turn);
     else if (online.myColor === turn) status = text("yourTurn");
     else status = text("opponentTurn");
   } else if (online.status === "finished") {
@@ -2541,6 +2850,11 @@ modeSelect.addEventListener("change", () => {
 });
 playerSide.addEventListener("change", () => maybeAiMove());
 newGameBtn.addEventListener("click", resetGame);
+gameEndNewBtn.addEventListener("click", () => {
+  closeGameEndOverlay();
+  resetGame();
+});
+gameEndReviewBtn.addEventListener("click", reviewFinishedGame);
 undoBtn.addEventListener("click", undo);
 downloadPgnBtn.addEventListener("click", downloadPgn);
 trainerHintBtn.addEventListener("click", showTrainerHint);
@@ -2568,6 +2882,7 @@ const exitBtn = qs("#exitBtn");
 exitBtn.addEventListener("click", () => {
   if (online) onlineLeave();
   clearClock();
+  closeGameEndOverlay();
   closeMatchOverlay();
   closePgnOverlay();
   pgnNav.hidden = true;

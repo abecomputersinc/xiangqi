@@ -112,7 +112,6 @@ h2 {
 
 .topbar p,
 .status-bar p,
-.score-labels,
 .pv,
 label {
   color: var(--muted);
@@ -155,8 +154,87 @@ label {
 }
 
 .board-wrap {
-  width: min(63.8vh, 572px, 100%);
+  width: min(63.8vh, 572px, calc(100% - 56px));
   margin: 0 auto;
+  position: relative;
+}
+
+.eval-rail {
+  position: absolute;
+  left: -50px;
+  top: 22px;
+  bottom: 22px;
+  width: 26px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  z-index: 2;
+}
+
+.eval-rail strong {
+  display: block;
+  min-width: 42px;
+  transform: translateX(-8px);
+  padding: 3px 4px;
+  border: 1px solid rgba(37, 26, 17, 0.16);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(60, 38, 16, 0.12);
+}
+
+.eval-bar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(37, 26, 17, 0.16);
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 10px 22px rgba(60, 38, 16, 0.14);
+}
+
+#blackBar,
+#redBar {
+  width: 100%;
+  height: 50%;
+  transition: height 180ms ease;
+}
+
+#blackBar {
+  background: var(--black);
+}
+
+#redBar {
+  background: var(--red);
+}
+
+.mate-pattern-toast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: min(82%, 360px);
+  transform: translate(-50%, -50%);
+  padding: 14px 20px;
+  border: 1px solid rgba(255, 248, 226, 0.45);
+  border-radius: 8px;
+  background: rgba(37, 26, 17, 0.88);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  color: #fff8e2;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+}
+
+.mate-pattern-toast[hidden] {
+  display: none;
 }
 
 .fen-display {
@@ -372,7 +450,6 @@ label {
 }
 
 .controls,
-.scoreboard,
 .analysis,
 .history,
 .online,
@@ -716,6 +793,10 @@ label {
   z-index: 200;
 }
 
+#gameEndOverlay {
+  z-index: 180;
+}
+
 .overlay-content {
   position: relative;
   background: var(--panel);
@@ -743,6 +824,24 @@ label {
 
 .overlay-close:hover {
   color: var(--red);
+}
+
+.game-end-dialog {
+  text-align: center;
+}
+
+.game-end-result {
+  margin: 8px 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.game-end-pattern {
+  margin: -6px 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .overlay-content .online {
@@ -1035,45 +1134,6 @@ input[type="range"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.score-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.score-head strong {
-  font-size: 30px;
-}
-
-.bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  height: 18px;
-  overflow: hidden;
-  margin: 12px 0 6px;
-  border: 1px solid rgba(37, 26, 17, 0.16);
-  border-radius: 6px;
-  background: white;
-}
-
-#blackBar {
-  justify-self: end;
-  height: 100%;
-  background: var(--black);
-}
-
-#redBar {
-  height: 100%;
-  background: var(--red);
-}
-
-.score-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
 .move-score {
   font-size: 15px;
   line-height: 1.45;
@@ -1112,7 +1172,7 @@ input[type="range"] {
   }
 
   .board-wrap {
-    width: min(100%, 61.6vh, 550px);
+    width: min(calc(100% - 56px), 61.6vh, 550px);
   }
 
   .topbar {
