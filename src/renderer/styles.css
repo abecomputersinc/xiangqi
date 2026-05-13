@@ -86,6 +86,42 @@ button:disabled {
   gap: 16px;
 }
 
+.board-zone.setup-active {
+  display: grid;
+  grid-template-columns: minmax(148px, 172px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.setup-guide {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--accent);
+  background: rgba(31, 111, 120, 0.08);
+  color: var(--ink);
+}
+
+.board-zone.setup-active .setup-guide {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.board-zone.setup-active .board-wrap,
+.board-zone.setup-active .fen-display {
+  grid-column: 2;
+}
+
+.setup-guide h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.setup-guide p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -354,6 +390,27 @@ label {
   line-height: 1;
 }
 
+.opening-name-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 18;
+  transform: translate(-50%, -50%);
+  max-width: min(72%, 280px);
+  padding: 14px 24px;
+  border: 1px solid rgba(255, 248, 226, 0.58);
+  border-radius: 8px;
+  background: rgba(37, 26, 17, 0.84);
+  color: #fff8e2;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+}
+
 .square.hint::after,
 .square.capture::after,
 .square.selected::after,
@@ -390,6 +447,60 @@ label {
 
 .square.trainer-target {
   box-shadow: 0 0 0 4px rgba(184, 107, 22, 0.48);
+}
+
+.board.setup-mode .square {
+  cursor: crosshair;
+}
+
+.setup-piece-menu {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(5, 42px);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(37, 26, 17, 0.18);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.setup-piece-option {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  background: #fbf4e5;
+  font-family: "STKaiti", "Kaiti SC", "DFKai-SB", "BiauKai", "KaiTi", "楷体", "Microsoft YaHei", "SimSun", "Noto Sans CJK SC", serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.setup-piece-option.red {
+  color: var(--red);
+}
+
+.setup-piece-option.black {
+  color: var(--black);
+}
+
+.setup-piece-option.empty {
+  grid-column: span 5;
+  width: auto;
+  border-radius: 6px;
+  background: white;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.setup-piece-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
 }
 
 .piece {
@@ -436,7 +547,7 @@ label {
 .actions-bar {
   margin-top: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
   gap: 10px;
   padding: 14px;
   border: 1px solid rgba(37, 26, 17, 0.12);
@@ -454,6 +565,7 @@ label {
 .history,
 .online,
 .clocks,
+.setup-panel,
 .pgn-nav,
 .trainer-panel,
 .profile-panel {
@@ -533,6 +645,12 @@ label {
   padding: 8px 0;
 }
 
+#pgnPlayFromHereBtn {
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .pgn-position {
   margin: 0;
   text-align: center;
@@ -550,6 +668,19 @@ label {
 .trainer-panel {
   display: grid;
   gap: 10px;
+}
+
+.setup-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-panel h2 {
+  margin: 0;
+}
+
+.setup-actions button {
+  padding: 8px 10px;
 }
 
 .trainer-head {
@@ -692,6 +823,137 @@ label {
 .pgn-game-option span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.library-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(136px, 0.8fr) repeat(4, minmax(110px, 1fr)) auto auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.library-filters input,
+.library-filters select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(37, 26, 17, 0.18);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.library-filters button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.library-favorite-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(37, 26, 17, 0.18);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.library-filters .library-favorite-filter input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  padding: 0;
+}
+
+.library-count {
+  min-height: 16px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.library-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(420px, 55vh);
+  margin-top: 8px;
+  overflow: auto;
+}
+
+.library-section-title {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.library-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(37, 26, 17, 0.14);
+  border-radius: 6px;
+  background: white;
+}
+
+.library-game.favorite {
+  border-color: rgba(184, 107, 22, 0.5);
+  background: rgba(184, 107, 22, 0.06);
+}
+
+.library-game strong,
+.library-game span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.library-game strong {
+  font-size: 13px;
+}
+
+.library-game span,
+.library-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.library-game-actions {
+  display: grid;
+  grid-template-columns: minmax(36px, auto) repeat(2, minmax(68px, auto));
+  gap: 6px;
+}
+
+.library-game[data-source="indexed"] .library-game-actions {
+  grid-template-columns: minmax(36px, auto) minmax(68px, auto);
+}
+
+.library-game-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.library-game-actions .library-favorite-btn {
+  min-width: 36px;
+  padding: 0;
+  color: var(--warn);
+  font-size: 18px;
+  line-height: 1;
 }
 
 .clocks {
@@ -1022,6 +1284,10 @@ label {
   max-width: 520px;
 }
 
+.overlay-content--library {
+  max-width: 940px;
+}
+
 .startup-hint {
   margin: 0 0 14px;
   color: var(--muted);
@@ -1130,6 +1396,10 @@ input[type="range"] {
   gap: 10px;
 }
 
+.setup-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .online-match-buttons {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1156,19 +1426,82 @@ input[type="range"] {
   max-height: 210px;
   overflow: auto;
   margin: 0;
-  padding-left: 24px;
+  padding: 0;
+  list-style: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
 }
 
 #moveList li {
-  padding: 4px 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(37, 26, 17, 0.08);
+}
+
+#moveList span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#moveList .move-no {
+  color: var(--muted);
+}
+
+#moveList .move-red {
+  color: var(--red);
+}
+
+#moveList .move-black {
+  color: var(--black);
+}
+
+.review-row {
+  align-items: stretch;
+}
+
+.review-move-btn {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px 7px;
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+}
+
+.review-move-btn:hover,
+.review-move-btn.current {
+  border-color: rgba(35, 114, 195, 0.35);
+  background: rgba(35, 114, 195, 0.06);
+}
+
+.review-move-label {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.review-move-meta {
+  color: var(--muted);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+
+  .board-zone.setup-active {
+    display: flex;
   }
 
   .board-wrap {
@@ -1212,6 +1545,10 @@ input[type="range"] {
   }
 
   .online-match-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .library-filters {
     grid-template-columns: 1fr;
   }
 

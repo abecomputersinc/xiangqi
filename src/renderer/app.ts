@@ -40,6 +40,146 @@ const pieceNames = {
   p: "Pawn"
 };
 const GOOD_MOVE_LOSS_CP = 100;
+const SETUP_PIECE_CODES = ["K", "A", "B", "N", "R", "C", "P", "k", "a", "b", "n", "r", "c", "p"];
+const SETUP_MAX_PIECES = { k: 1, a: 2, b: 2, n: 2, r: 2, c: 2, p: 5 };
+const GAME_LIBRARY_KEY = "xiangqi.gameLibrary.v1";
+const GAME_LIBRARY_LIMIT = 200;
+const NOTATION_NUMBERS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+const NOTATION_PIECES = {
+  K: "帅",
+  A: "仕",
+  B: "相",
+  N: "马",
+  R: "车",
+  C: "炮",
+  P: "兵",
+  k: "将",
+  a: "士",
+  b: "象",
+  n: "马",
+  r: "车",
+  c: "炮",
+  p: "卒",
+};
+const PIECE_VALUES = { k: 10000, r: 900, c: 450, n: 400, b: 220, a: 220, p: 100 };
+
+const OPENING_BOOK = [
+  {
+    line: [],
+    name: { en: "Starting position", zh: "初始局面" },
+    description: {
+      en: "Choose a first move to steer the game into a familiar system.",
+      zh: "第一手决定开局方向。先看常见体系，再边下边记。",
+    },
+    moves: [
+      { uci: "h2e2", name: { en: "Central Cannon", zh: "中炮" }, winRate: 56, popularity: 42, idea: { en: "Occupy the center and aim at the black king.", zh: "炮占中路，直接瞄准黑方中宫。" } },
+      { uci: "b2e2", name: { en: "Central Cannon", zh: "左中炮" }, winRate: 54, popularity: 16, idea: { en: "A central cannon with different flank development.", zh: "同样抢中，保留右侧子力变化。" } },
+      { uci: "h0g2", name: { en: "Horse Opening", zh: "起马局" }, winRate: 51, popularity: 14, idea: { en: "Develop steadily before committing the cannon.", zh: "先出马，布局更稳健灵活。" } },
+      { uci: "c3c4", name: { en: "Pawn Opening", zh: "仙人指路" }, winRate: 50, popularity: 12, idea: { en: "Probe the opponent and keep many transpositions open.", zh: "用兵试探，对方应法不同可转多种体系。" } },
+    ],
+  },
+  {
+    line: ["h2e2"],
+    name: { en: "Central Cannon", zh: "中炮" },
+    description: {
+      en: "Red has taken the center; Black now chooses the defensive structure.",
+      zh: "红方已架中炮，黑方下一手通常决定是屏风马、顺炮还是列炮。",
+    },
+    moves: [
+      { uci: "h9g7", name: { en: "Screen Horse", zh: "屏风马" }, winRate: 49, popularity: 34, idea: { en: "Develop a horse to guard the center and prepare the second horse.", zh: "右马护中，准备双马成屏风。" } },
+      { uci: "b9c7", name: { en: "Screen Horse", zh: "屏风马" }, winRate: 49, popularity: 28, idea: { en: "The other horse develops first; the plan is still a screen-horse setup.", zh: "左马先出，仍以双马屏风抗中炮。" } },
+      { uci: "h7e7", name: { en: "Same-direction Cannon", zh: "顺炮" }, winRate: 51, popularity: 18, idea: { en: "Meet cannon with cannon on the same central file.", zh: "同侧炮也平中，直接与中炮对抗。" } },
+      { uci: "b7e7", name: { en: "Opposite Cannon", zh: "列炮" }, winRate: 50, popularity: 10, idea: { en: "Use the opposite cannon for sharper central tension.", zh: "异侧炮入中，形成更尖锐的中路对峙。" } },
+    ],
+  },
+  {
+    line: ["h2e2", "h9g7"],
+    name: { en: "Central Cannon vs Screen Horse", zh: "中炮对屏风马" },
+    description: {
+      en: "The classic main family: Red attacks the center, Black builds a horse screen.",
+      zh: "最经典的开局大类：红方中炮抢攻，黑方以双马屏风稳守反击。",
+    },
+    moves: [
+      { uci: "h0g2", name: { en: "Develop right horse", zh: "马二进三" }, winRate: 53, popularity: 38, idea: { en: "Support the central cannon and prepare rook development.", zh: "补强中路，准备出车展开主线。" } },
+      { uci: "b0c2", name: { en: "Develop left horse", zh: "马八进七" }, winRate: 52, popularity: 22, idea: { en: "Build both wings before choosing the attacking plan.", zh: "左右均衡出子，再决定攻势方向。" } },
+      { uci: "i0i1", name: { en: "Right rook lift", zh: "车一进一" }, winRate: 51, popularity: 12, idea: { en: "Lift the rook early and keep pressure flexible.", zh: "早升右车，保持横向机动压力。" } },
+    ],
+  },
+  {
+    line: ["h2e2", "h7e7"],
+    name: { en: "Same-direction Cannon", zh: "顺炮" },
+    description: {
+      en: "Both central cannons face the same file; development speed matters.",
+      zh: "双方同侧炮平中，子力展开速度和中路线权很关键。",
+    },
+    moves: [
+      { uci: "h0g2", name: { en: "Horse protects center", zh: "马二进三" }, winRate: 53, popularity: 36, idea: { en: "Develop naturally while protecting key central points.", zh: "自然出马，兼顾中路要点。" } },
+      { uci: "i0h0", name: { en: "Rook contests file", zh: "车一平二" }, winRate: 52, popularity: 18, idea: { en: "Bring the rook toward the open flank file.", zh: "右车抢线，争取先手展开。" } },
+      { uci: "b0c2", name: { en: "Balanced horses", zh: "马八进七" }, winRate: 51, popularity: 16, idea: { en: "Keep the position sound before central exchanges.", zh: "先稳固阵形，再处理中路交换。" } },
+    ],
+  },
+  {
+    line: ["h2e2", "b7e7"],
+    name: { en: "Opposite Cannon", zh: "列炮" },
+    description: {
+      en: "The cannons enter from opposite sides, often leading to direct tactical play.",
+      zh: "双方异侧炮进中，常见直接对攻和早期战术。",
+    },
+    moves: [
+      { uci: "h0g2", name: { en: "Steady horse", zh: "马二进三" }, winRate: 52, popularity: 32, idea: { en: "Develop with tempo and keep the central cannon supported.", zh: "稳健出马，继续支撑中炮。" } },
+      { uci: "i0h0", name: { en: "Rook activation", zh: "车一平二" }, winRate: 51, popularity: 15, idea: { en: "Activate the rook before the center opens.", zh: "趁中路未开，先活右车。" } },
+    ],
+  },
+  {
+    line: ["h2e2", "h9g7", "h0g2", "b9c7"],
+    name: { en: "Central Cannon vs Double Screen Horse", zh: "中炮对双屏风马" },
+    description: {
+      en: "Black has completed the screen-horse shape; Red can choose attack or patient development.",
+      zh: "黑方双马屏风成形，红方可急攻，也可稳步出车布局。",
+    },
+    moves: [
+      { uci: "i0h0", name: { en: "Right rook out", zh: "车一平二" }, winRate: 53, popularity: 30, idea: { en: "Contest the right file and prepare pressure on the horse.", zh: "右车出动，准备压制黑方马路。" } },
+      { uci: "b0c2", name: { en: "Both horses developed", zh: "马八进七" }, winRate: 52, popularity: 24, idea: { en: "Complete development before choosing a pawn break.", zh: "先完成双马，再选择兵路突破。" } },
+      { uci: "e3e4", name: { en: "Central pawn probe", zh: "兵五进一" }, winRate: 50, popularity: 9, idea: { en: "Challenge the center immediately.", zh: "直接冲中兵，考验黑方中路应对。" } },
+    ],
+  },
+  {
+    line: ["b2e2"],
+    name: { en: "Left Central Cannon", zh: "左中炮" },
+    description: {
+      en: "A central cannon from the left side; many ideas transpose to Central Cannon systems.",
+      zh: "左炮平中，常可转入中炮体系，也保留右侧出子弹性。",
+    },
+    moves: [
+      { uci: "b9c7", name: { en: "Screen Horse", zh: "屏风马" }, winRate: 49, popularity: 30, idea: { en: "Build a horse screen against the center.", zh: "以屏风马阵形抗衡中炮。" } },
+      { uci: "b7e7", name: { en: "Same-direction Cannon", zh: "顺炮" }, winRate: 50, popularity: 16, idea: { en: "Answer with a central cannon from the same side.", zh: "同侧炮平中，进入顺炮类变化。" } },
+    ],
+  },
+  {
+    line: ["h0g2"],
+    name: { en: "Horse Opening", zh: "起马局" },
+    description: {
+      en: "A flexible first move that delays the central cannon decision.",
+      zh: "起马局先出子不定型，常根据黑方应法转中炮、屏风马或稳健布局。",
+    },
+    moves: [
+      { uci: "h9g7", name: { en: "Symmetric horse", zh: "还起马" }, winRate: 50, popularity: 28, idea: { en: "Match development and keep the center flexible.", zh: "对称出马，双方保持弹性。" } },
+      { uci: "h7e7", name: { en: "Central Cannon reply", zh: "炮8平5" }, winRate: 51, popularity: 20, idea: { en: "Take the center before Red commits.", zh: "趁红方未架炮，黑方先占中路。" } },
+    ],
+  },
+  {
+    line: ["c3c4"],
+    name: { en: "Pawn Opening", zh: "仙人指路" },
+    description: {
+      en: "A probing pawn move. The opening name is humble, but the transpositions are rich.",
+      zh: "以三兵探路，名称朴素，变化却很丰富。",
+    },
+    moves: [
+      { uci: "h9g7", name: { en: "Screen Horse setup", zh: "屏风马趋向" }, winRate: 50, popularity: 26, idea: { en: "Develop a horse and wait for Red's setup.", zh: "先出马，看红方后续转型。" } },
+      { uci: "h7e7", name: { en: "Central Cannon reply", zh: "中炮趋向" }, winRate: 51, popularity: 14, idea: { en: "Use the cannon to claim central space.", zh: "用炮抢中，反问红方布局。" } },
+    ],
+  },
+];
 
 function qs<T = any>(selector: string): T {
   return document.querySelector(selector) as T;
@@ -50,15 +190,21 @@ function qsa<T extends Element = any>(selector: string): NodeListOf<T> {
 }
 
 const boardEl = qs("#board");
+const boardZone = qs(".board-zone");
+const topFileLabels = qsa(".files-top span");
+const bottomFileLabels = qsa(".files-bottom span");
 const matePatternToast = qs("#matePatternToast");
 const statusText = qs("#statusText");
 const turnPill = qs("#turnPill");
 const modeSelect = qs("#modeSelect");
 const playerSide = qs("#playerSide");
+const aiLevelSelect = qs("#aiLevelSelect");
 const depthInput = qs("#depthInput");
 const depthLabel = qs("#depthLabel");
 const newGameBtn = qs("#newGameBtn");
 const undoBtn = qs("#undoBtn");
+const saveGameBtn = qs("#saveGameBtn");
+const libraryBtn = qs("#libraryBtn");
 const downloadPgnBtn = qs("#downloadPgnBtn");
 const evalText = qs("#evalText");
 const redBar = qs("#redBar");
@@ -104,6 +250,7 @@ const pgnNextBtn = qs("#pgnNextBtn");
 const pgnLastBtn = qs("#pgnLastBtn");
 const pgnPosition = qs("#pgnPosition");
 const pgnLastMoveEl = qs("#pgnLastMove");
+const pgnPlayFromHereBtn = qs("#pgnPlayFromHereBtn");
 const pgnImportAgain = qs("#pgnImportAgain");
 
 // Startup mode picker DOM
@@ -111,6 +258,8 @@ const startupOverlay = qs("#startupOverlay");
 const startupModeStep = qs("#startupModeStep");
 const startupSideStep = qs("#startupSideStep");
 const startupSideBack = qs("#startupSideBack");
+const startupAiLevelWrap = qs("#startupAiLevelWrap");
+const startupAiLevelSelect = qs("#startupAiLevelSelect");
 const startupAuthActions = qs("#startupAuthActions");
 const startupLoginBtn = qs("#startupLoginBtn");
 const startupSignupBtn = qs("#startupSignupBtn");
@@ -135,6 +284,34 @@ const gameEndResult = qs("#gameEndResult");
 const gameEndPattern = qs("#gameEndPattern");
 const gameEndNewBtn = qs("#gameEndNewBtn");
 const gameEndReviewBtn = qs("#gameEndReviewBtn");
+
+// Local game library DOM
+const libraryOverlay = qs("#libraryOverlay");
+const libraryOverlayClose = qs("#libraryOverlayClose");
+const libraryTitle = qs("#libraryTitle");
+const libraryHint = qs("#libraryHint");
+const libraryList = qs("#libraryList");
+const libraryStatus = qs("#libraryStatus");
+const librarySaveCurrentBtn = qs("#librarySaveCurrentBtn");
+const libraryImportPgnBtn = qs("#libraryImportPgnBtn");
+const librarySearchInput = qs("#librarySearchInput");
+const libraryResultFilter = qs("#libraryResultFilter");
+const libraryPlayerFilter = qs("#libraryPlayerFilter");
+const libraryEventFilter = qs("#libraryEventFilter");
+const libraryYearFilter = qs("#libraryYearFilter");
+const libraryOpeningFilter = qs("#libraryOpeningFilter");
+const libraryFavoriteFilter = qs("#libraryFavoriteFilter");
+const libraryClearFiltersBtn = qs("#libraryClearFiltersBtn");
+const libraryCount = qs("#libraryCount");
+
+// Setup position DOM
+const setupPanel = qs("#setupPanel");
+const setupGuide = qs("#setupGuide");
+const setupPieceMenu = qs("#setupPieceMenu");
+const setupTurnSelect = qs("#setupTurnSelect");
+const setupStartBtn = qs("#setupStartBtn");
+const setupClearBtn = qs("#setupClearBtn");
+const setupPlayBtn = qs("#setupPlayBtn");
 
 const I18N = {
   en: {
@@ -170,10 +347,88 @@ const I18N = {
     red: "Red",
     black: "Black",
     userVsAi: "User vs AI",
+    setupPosition: "Setup position",
+    setupPositionHint: "Place pieces and start from any board",
+    gameLibrary: "Game library",
+    gameLibraryHint: "Browse saved games on this device",
+    savedGamesHint: "Saved games stay on this device.",
+    saveGame: "Save",
+    saveCurrentGame: "Save current game",
+    library: "Library",
+    importPgnToLibrary: "Import PGN",
+    importPgnsToLibrary: "Import PGN/PGNS",
+    indexingLibrary: "Indexing game library...",
+    importedLibrary: (count, name) => `Indexed ${count} games from ${name}.`,
+    libraryImportUnavailable: "Large PGNS import is available in the Electron app.",
+    searchGames: "Search games",
+    allResults: "All results",
+    redWins: "Red wins",
+    blackWins: "Black wins",
+    draws: "Draws",
+    unknownResult: "Unknown",
+    playerFilter: "Player",
+    eventFilter: "Event",
+    yearFilter: "Year",
+    openingFilter: "Opening",
+    clearFilters: "Clear",
+    librarySearchCount: (shown, total) => `Showing ${shown} of ${total} indexed games.`,
+    localSavedGames: "Saved games",
+    indexedGames: "Indexed PGN library",
+    localLibrarySearchCount: (shown, total) => `Saved ${shown} of ${total} games.`,
+    noLibraryMatches: "No games match these filters.",
+    favoritesOnly: "Favorites only",
+    favoriteGame: "Add to favorites",
+    unfavoriteGame: "Remove from favorites",
+    favoriteSaved: "Favorite updated.",
+    playFromHere: "Play from here",
+    playingFromReview: "Playing from this review position.",
+    reviewWaiting: "Queued",
+    reviewFailedShort: "Analysis failed",
+    reviewLossShort: loss => `Loss ${loss}`,
+    reviewBestShort: label => `Best ${label}`,
+    reviewMoveLine: (mark, score, loss) => `${mark ? `${mark} · ` : ""}Score ${score} · ${loss}`,
+    reviewBestLine: (label, score) => `Best move: ${label}${score ? ` (${score})` : ""}`,
+    coachIntro: "Why:",
+    coachNoClear: "Keeps the position coordinated and avoids an immediate tactical concession.",
+    coachCheck: "Gives check, so the opponent must answer the king threat first.",
+    coachCapture: piece => `Wins material by taking ${piece}.`,
+    coachFreeCapture: "The captured piece is not immediately recaptured.",
+    coachTradeWin: (captured, piece) => `If pieces are traded, ${captured} is worth more than ${piece}.`,
+    coachTradeEven: "The exchange does not lose material and simplifies the position.",
+    coachTradeRisk: "The capture can be recaptured, so it needs the tactical threat behind it.",
+    coachThreat: (piece, square) => `Creates a threat against ${piece} on ${square}.`,
+    coachPin: piece => `Pins ${piece} to the king line, limiting its mobility.`,
+    coachProtected: count => `The landing square is protected by ${count} friendly piece${count === 1 ? "" : "s"}.`,
+    coachMobility: piece => `${piece} becomes more active after the move.`,
+    noGameToSave: "No game to save yet.",
+    gameSaved: title => `Saved ${title}.`,
+    gameSaveFailed: error => `Could not save game: ${error}`,
+    noSavedGames: "No saved games yet.",
+    openGame: "Open",
+    deleteGame: "Delete",
+    confirmDeleteGame: title => `Delete ${title}?`,
+    gameDeleted: "Game deleted.",
+    setupGuide: "Setup guide",
+    setupGuideText: "Right-click an intersection to choose a piece. Left-click clears that point. Illegal choices are disabled.",
+    turn: "Turn",
+    emptySquare: "Empty square",
+    clearBoard: "Clear board",
+    playPosition: "Play position",
+    setupReady: "Set up a position. Right-click an intersection to choose a piece.",
+    setupApplied: "Playing from custom position.",
+    setupNeedsKings: "Add both kings before starting.",
+    setupIllegalSquare: (piece, square) => `${piece} cannot be placed on ${square}.`,
+    setupTooManyPieces: (color, piece, max) => `${color} can have at most ${max} ${piece}.`,
+    setupKingsFacing: "Kings cannot face each other on an open file.",
     humanLocal: "Human vs Human (local)",
     userOnline: "User vs User (online)",
     pgnViewer: "PGN viewer",
     youPlay: "You play",
+    aiLevel: "AI level",
+    aiBeginner: "Beginner",
+    aiAmateur: "Amateur",
+    aiCounty: "County",
+    aiMaster: "Master",
     engineDepth: "Engine depth",
     newGame: "New Game",
     realtimeScore: "Realtime score",
@@ -336,7 +591,7 @@ const I18N = {
     noAnalysis: "No engine analysis available.",
     analysisFailed: error => `Analysis failed: ${error || "unknown"}`,
     movesCount: count => `${count} move${count === 1 ? "" : "s"}`,
-    piece: { K: "King", A: "Advisor", B: "Elephant", N: "Horse", R: "Rook", C: "Cannon", P: "Pawn", k: "King", a: "Advisor", b: "Elephant", n: "Horse", r: "Rook", c: "Cannon", p: "Pawn" },
+    pieceName: { K: "King", A: "Advisor", B: "Elephant", N: "Horse", R: "Rook", C: "Cannon", P: "Pawn", k: "King", a: "Advisor", b: "Elephant", n: "Horse", r: "Rook", c: "Cannon", p: "Pawn" },
   },
   zh: {
     appLang: "zh-Hans",
@@ -371,10 +626,88 @@ const I18N = {
     red: "红方",
     black: "黑方",
     userVsAi: "人机对弈",
+    setupPosition: "摆局",
+    setupPositionHint: "自由摆放棋子并从任意局面开始",
+    gameLibrary: "棋谱库",
+    gameLibraryHint: "查看保存在本机的棋局",
+    savedGamesHint: "棋谱会保存在这台设备上。",
+    saveGame: "保存",
+    saveCurrentGame: "保存当前棋局",
+    library: "棋谱库",
+    importPgnToLibrary: "导入 PGN",
+    importPgnsToLibrary: "导入 PGN/PGNS",
+    indexingLibrary: "正在索引棋谱库...",
+    importedLibrary: (count, name) => `已从 ${name} 索引 ${count} 局。`,
+    libraryImportUnavailable: "大型 PGNS 导入需要在 Electron 桌面版中使用。",
+    searchGames: "搜索棋局",
+    allResults: "全部结果",
+    redWins: "红胜",
+    blackWins: "黑胜",
+    draws: "和棋",
+    unknownResult: "未知",
+    playerFilter: "棋手",
+    eventFilter: "赛事",
+    yearFilter: "年份",
+    openingFilter: "开局",
+    clearFilters: "清除",
+    librarySearchCount: (shown, total) => `显示 ${shown} / ${total} 个索引棋局。`,
+    localSavedGames: "已保存棋局",
+    indexedGames: "索引棋谱库",
+    localLibrarySearchCount: (shown, total) => `已保存棋局 ${shown} / ${total}。`,
+    noLibraryMatches: "没有符合筛选条件的棋局。",
+    favoritesOnly: "只看收藏",
+    favoriteGame: "加入收藏",
+    unfavoriteGame: "取消收藏",
+    favoriteSaved: "收藏已更新。",
+    playFromHere: "从这里重新下",
+    playingFromReview: "已从当前复盘局面继续对局。",
+    reviewWaiting: "排队中",
+    reviewFailedShort: "分析失败",
+    reviewLossShort: loss => `损失 ${loss}`,
+    reviewBestShort: label => `最佳 ${label}`,
+    reviewMoveLine: (mark, score, loss) => `${mark ? `${mark} · ` : ""}评分 ${score} · ${loss}`,
+    reviewBestLine: (label, score) => `最佳着法：${label}${score ? `（${score}）` : ""}`,
+    coachIntro: "为什么：",
+    coachNoClear: "这手保持局面协调，避免马上出现战术亏损。",
+    coachCheck: "形成将军，对方必须先应将，主动权在你手里。",
+    coachCapture: piece => `吃掉${piece}，直接取得子力收益。`,
+    coachFreeCapture: "被吃的子暂时不能被直接追回。",
+    coachTradeWin: (captured, piece) => `即使兑子，${captured}的价值也高于${piece}，兑换有利。`,
+    coachTradeEven: "兑子不亏，还能简化局面。",
+    coachTradeRisk: "这步吃子可能被回吃，需要依靠后续威胁补偿。",
+    coachThreat: (piece, square) => `制造对${square}的${piece}的威胁。`,
+    coachPin: piece => `牵制${piece}，它背后连着将帅线，活动受限。`,
+    coachProtected: count => `落点有 ${count} 个己方子力保护。`,
+    coachMobility: piece => `${piece}走到更活跃的位置，后续选择更多。`,
+    noGameToSave: "暂无可保存棋局。",
+    gameSaved: title => `已保存 ${title}。`,
+    gameSaveFailed: error => `保存失败：${error}`,
+    noSavedGames: "暂无已保存棋谱。",
+    openGame: "打开",
+    deleteGame: "删除",
+    confirmDeleteGame: title => `删除 ${title}？`,
+    gameDeleted: "棋谱已删除。",
+    setupGuide: "摆棋说明",
+    setupGuideText: "在交叉点右键选择棋子。左键清空该点。不合法的选择会被禁用。",
+    turn: "走棋方",
+    emptySquare: "清空格子",
+    clearBoard: "清空棋盘",
+    playPosition: "开始此局",
+    setupReady: "正在摆局。右键交叉点选择棋子。",
+    setupApplied: "已从自定义局面开始。",
+    setupNeedsKings: "开始前需要放置双方将帅。",
+    setupIllegalSquare: (piece, square) => `${piece} 不能放在 ${square}。`,
+    setupTooManyPieces: (color, piece, max) => `${color}${piece}最多 ${max} 个。`,
+    setupKingsFacing: "双方将帅不能在同一路线上直接照面。",
     humanLocal: "本地双人",
     userOnline: "在线对弈",
     pgnViewer: "PGN 查看器",
     youPlay: "执棋方",
+    aiLevel: "电脑级别",
+    aiBeginner: "新手",
+    aiAmateur: "业余",
+    aiCounty: "县级",
+    aiMaster: "大师",
     engineDepth: "引擎深度",
     newGame: "新棋局",
     realtimeScore: "实时评分",
@@ -537,7 +870,7 @@ const I18N = {
     noAnalysis: "暂无引擎分析。",
     analysisFailed: error => `分析失败：${error || "未知错误"}`,
     movesCount: count => `${count} 步`,
-    piece: { K: "帅", A: "仕", B: "相", N: "马", R: "车", C: "炮", P: "兵", k: "将", a: "士", b: "象", n: "马", r: "车", c: "炮", p: "卒" },
+    pieceName: { K: "帅", A: "仕", B: "相", N: "马", R: "车", C: "炮", P: "兵", k: "将", a: "士", b: "象", n: "马", r: "车", c: "炮", p: "卒" },
   },
 };
 
@@ -593,6 +926,11 @@ function text(key, ...args) {
   return typeof value === "function" ? value(...args) : value;
 }
 
+function localized(value) {
+  if (!value || typeof value === "string") return value || "";
+  return value[lang] || value.en || value.zh || "";
+}
+
 function setText(selector, value) {
   const el = document.querySelector(selector);
   if (el) el.textContent = value;
@@ -638,7 +976,12 @@ let gameResult = null;
 let currentEval = 0;
 let evalRequest = 0;
 let busy = false;
+let openingOverlayText = "";
+let openingOverlayId = 0;
 let pendingSideMode = "ai";
+let setupMenuSquare = null;
+let pgnSourceText = "";
+let pgnSourceTitle = "";
 let trainerState = {
   requestId: 0,
   fen: "",
@@ -735,8 +1078,8 @@ function parseFen(fen) {
   return { board: parsed, turn: side === "b" ? "black" : "red" };
 }
 
-function boardToFen() {
-  const placement = board.map(row => {
+function boardToFen(sourceBoard = board, sourceTurn = turn) {
+  const placement = sourceBoard.map(row => {
     let out = "";
     let empty = 0;
     for (const cell of row) {
@@ -751,7 +1094,7 @@ function boardToFen() {
     if (empty) out += empty;
     return out;
   }).join("/");
-  return `${placement} ${turn === "red" ? "w" : "b"} - - 0 1`;
+  return `${placement} ${sourceTurn === "red" ? "w" : "b"} - - 0 1`;
 }
 
 function cloneBoard(source = board) {
@@ -761,6 +1104,10 @@ function cloneBoard(source = board) {
 function colorOf(piece) {
   if (!piece) return null;
   return piece === piece.toUpperCase() ? "red" : "black";
+}
+
+function oppositeColor(color) {
+  return color === "red" ? "black" : "red";
 }
 
 function colorLabel(color) {
@@ -779,7 +1126,27 @@ function reasonText(reason) {
 }
 
 function pieceLabel(piece) {
-  return text("piece")[piece] || pieceNames[piece] || piece;
+  return text("pieceName")[piece] || pieceNames[piece] || piece;
+}
+
+function pieceValue(piece) {
+  return PIECE_VALUES[piece?.toLowerCase()] || 0;
+}
+
+function renderSetupPanel() {
+  const active = modeSelect.value === "setup";
+  setupPanel.hidden = !active;
+  setupGuide.hidden = !active;
+  boardZone.classList.toggle("setup-active", active);
+  if (!active) closeSetupPieceMenu();
+  const turnOptions = setupTurnSelect.querySelectorAll("option");
+  if (turnOptions[0]) turnOptions[0].textContent = text("red");
+  if (turnOptions[1]) turnOptions[1].textContent = text("black");
+  setupTurnSelect.value = turn;
+  if (active) {
+    undoBtn.disabled = true;
+    downloadPgnBtn.hidden = true;
+  }
 }
 
 function applyLanguage() {
@@ -808,19 +1175,31 @@ function applyLanguage() {
   const modeOptions = modeSelect.querySelectorAll("option");
   if (modeOptions[0]) modeOptions[0].textContent = text("userVsAi");
   if (modeOptions[1]) modeOptions[1].textContent = text("trainer");
-  if (modeOptions[2]) modeOptions[2].textContent = text("humanLocal");
-  if (modeOptions[3]) modeOptions[3].textContent = text("userOnline");
-  if (modeOptions[4]) modeOptions[4].textContent = text("pgnViewer");
+  if (modeOptions[2]) modeOptions[2].textContent = text("setupPosition");
+  if (modeOptions[3]) modeOptions[3].textContent = text("humanLocal");
+  if (modeOptions[4]) modeOptions[4].textContent = text("userOnline");
+  if (modeOptions[5]) modeOptions[5].textContent = text("pgnViewer");
   const sideOptions = playerSide.querySelectorAll("option");
   if (sideOptions[0]) sideOptions[0].textContent = text("red");
   if (sideOptions[1]) sideOptions[1].textContent = text("black");
+  for (const select of [aiLevelSelect, startupAiLevelSelect]) {
+    const aiLevelOptions = select.querySelectorAll("option");
+    if (aiLevelOptions[0]) aiLevelOptions[0].textContent = text("aiBeginner");
+    if (aiLevelOptions[1]) aiLevelOptions[1].textContent = text("aiAmateur");
+    if (aiLevelOptions[2]) aiLevelOptions[2].textContent = text("aiCounty");
+    if (aiLevelOptions[3]) aiLevelOptions[3].textContent = text("aiMaster");
+  }
+  if (startupAiLevelWrap?.firstChild) startupAiLevelWrap.firstChild.textContent = `${text("aiLevel")} `;
   const controlsLabels = qsa(".controls label");
   if (controlsLabels[1]?.firstChild) controlsLabels[1].firstChild.textContent = `${text("youPlay")} `;
-  if (controlsLabels[2]?.firstChild) controlsLabels[2].firstChild.textContent = `${text("engineDepth")} `;
+  if (controlsLabels[2]?.firstChild) controlsLabels[2].firstChild.textContent = `${text("aiLevel")} `;
+  if (controlsLabels[3]?.firstChild) controlsLabels[3].firstChild.textContent = `${text("engineDepth")} `;
   setText("#newGameBtn", text("newGame"));
   setText(".analysis h2", text("moveAnalysis"));
   setText(".history h2", text("moves"));
   setText("#undoBtn", text("undo"));
+  setText("#saveGameBtn", text("saveGame"));
+  setText("#libraryBtn", text("library"));
   setText("#downloadPgnBtn", text("downloadPgn"));
   setText("#exitBtn", text("exit"));
   setText("#startupTitle", text("chooseMode"));
@@ -830,6 +1209,8 @@ function applyLanguage() {
   const optionLabels = [
     [text("vsAi"), text("vsAiHint")],
     [text("trainer"), text("trainerHintMode")],
+    [text("setupPosition"), text("setupPositionHint")],
+    [text("gameLibrary"), text("gameLibraryHint")],
     [text("vsHumanLocal"), text("vsHumanLocalHint")],
     [text("vsHumanOnline"), text("vsHumanOnlineHint")],
     [text("pgnViewer"), text("pgnViewerHint")],
@@ -866,6 +1247,31 @@ function applyLanguage() {
   setText("#pgnOverlay .startup-hint", text("pgnImportHint"));
   setText("#pgnDropZone", text("dropPgn"));
   setText("#pgnOpenFileBtn", text("openFile"));
+  setText("#libraryTitle", text("gameLibrary"));
+  setText("#libraryHint", text("savedGamesHint"));
+  setText("#librarySaveCurrentBtn", text("saveCurrentGame"));
+  setText("#libraryImportPgnBtn", text("importPgnsToLibrary"));
+  setAttr("#librarySearchInput", "placeholder", text("searchGames"));
+  setAttr("#libraryPlayerFilter", "placeholder", text("playerFilter"));
+  setAttr("#libraryEventFilter", "placeholder", text("eventFilter"));
+  setAttr("#libraryYearFilter", "placeholder", text("yearFilter"));
+  setAttr("#libraryOpeningFilter", "placeholder", text("openingFilter"));
+  setText("#libraryClearFiltersBtn", text("clearFilters"));
+  setText("#libraryFavoriteFilterText", text("favoritesOnly"));
+  const resultOptions = libraryResultFilter.querySelectorAll("option");
+  if (resultOptions[0]) resultOptions[0].textContent = text("allResults");
+  if (resultOptions[1]) resultOptions[1].textContent = text("redWins");
+  if (resultOptions[2]) resultOptions[2].textContent = text("blackWins");
+  if (resultOptions[3]) resultOptions[3].textContent = text("draws");
+  if (resultOptions[4]) resultOptions[4].textContent = text("unknownResult");
+  setText("#setupGuide h2", text("setupGuide"));
+  setText("#setupGuideText", text("setupGuideText"));
+  setText("#setupPanel h2", text("setupPosition"));
+  const setupLabels = qsa("#setupPanel .stack-label");
+  if (setupLabels[0]?.firstChild) setupLabels[0].firstChild.textContent = `${text("turn")}\n            `;
+  setText("#setupStartBtn", text("startPosition"));
+  setText("#setupClearBtn", text("clearBoard"));
+  setText("#setupPlayBtn", text("playPosition"));
   setText("#onlineOverlayTitle", text("onlinePlay"));
   const onlineLabel = document.querySelector("#onlineLobby label");
   if (onlineLabel?.firstChild) onlineLabel.firstChild.textContent = `${text("account")}\n              `;
@@ -887,8 +1293,10 @@ function applyLanguage() {
   setAttr("#pgnPrevBtn", "title", text("previous"));
   setAttr("#pgnNextBtn", "title", text("next"));
   setAttr("#pgnLastBtn", "title", text("end"));
+  setText("#pgnPlayFromHereBtn", text("playFromHere"));
   setAttr("#loginCloseBtn", "aria-label", text("close"));
   setAttr("#pgnOverlayClose", "aria-label", text("close"));
+  setAttr("#libraryOverlayClose", "aria-label", text("close"));
   setAttr("#overlayCloseBtn", "aria-label", text("close"));
   setAttr("#onlineCopyCode", "title", text("copy"));
   if (!history.length && modeSelect.value !== "pgn") moveScore.textContent = text("moveToSeeScore");
@@ -896,6 +1304,7 @@ function applyLanguage() {
   renderBoard();
   renderHistory();
   renderTrainerPanel();
+  renderSetupPanel();
   if (online) renderOnlineMatch();
   if (modeSelect.value === "pgn") {
     pgnUpdateNavUI();
@@ -1068,6 +1477,107 @@ function legalMoves(r, c) {
   });
 }
 
+function legalMovesOnBoard(r, c, targetBoard = board) {
+  const piece = targetBoard[r]?.[c];
+  const color = colorOf(piece);
+  if (!piece || !color) return [];
+  return pseudoMoves(r, c, targetBoard).filter(move => {
+    const next = cloneBoard(targetBoard);
+    next[move.r][move.c] = piece;
+    next[r][c] = null;
+    return !isInCheck(color, next);
+  });
+}
+
+function attacksSquare(fromR, fromC, toR, toC, targetBoard = board) {
+  const piece = targetBoard[fromR]?.[fromC];
+  const color = colorOf(piece);
+  const kind = piece?.toLowerCase();
+  if (!piece || !inBounds(toR, toC) || (fromR === toR && fromC === toC)) return false;
+  const dr = toR - fromR;
+  const dc = toC - fromC;
+  const adr = Math.abs(dr);
+  const adc = Math.abs(dc);
+
+  if (kind === "k") {
+    if (palace(color, toR, toC) && adr + adc === 1) return true;
+    return fromC === toC && targetBoard[toR]?.[toC]?.toLowerCase() === "k" && piecesBetween({ r: fromR, c: fromC }, { r: toR, c: toC }, targetBoard).length === 0;
+  }
+  if (kind === "a") return palace(color, toR, toC) && adr === 1 && adc === 1;
+  if (kind === "b") {
+    const staysHome = color === "red" ? toR >= 5 : toR <= 4;
+    return staysHome && adr === 2 && adc === 2 && !targetBoard[fromR + dr / 2]?.[fromC + dc / 2];
+  }
+  if (kind === "n") {
+    if (!((adr === 2 && adc === 1) || (adr === 1 && adc === 2))) return false;
+    const legR = fromR + (adr === 2 ? Math.sign(dr) : 0);
+    const legC = fromC + (adc === 2 ? Math.sign(dc) : 0);
+    return !targetBoard[legR]?.[legC];
+  }
+  if (kind === "r") {
+    return (fromR === toR || fromC === toC) && piecesBetween({ r: fromR, c: fromC }, { r: toR, c: toC }, targetBoard).length === 0;
+  }
+  if (kind === "c") {
+    return (fromR === toR || fromC === toC) && piecesBetween({ r: fromR, c: fromC }, { r: toR, c: toC }, targetBoard).length === 1;
+  }
+  if (kind === "p") {
+    const forward = color === "red" ? -1 : 1;
+    if (dr === forward && dc === 0) return true;
+    return crossedRiver(color, fromR) && dr === 0 && adc === 1;
+  }
+  return false;
+}
+
+function attackersToSquare(r, c, byColor, targetBoard = board, skip = null) {
+  const attackers = [];
+  for (let fromR = 0; fromR < 10; fromR += 1) {
+    for (let fromC = 0; fromC < 9; fromC += 1) {
+      if (skip && skip.r === fromR && skip.c === fromC) continue;
+      const piece = targetBoard[fromR][fromC];
+      if (colorOf(piece) !== byColor) continue;
+      if (attacksSquare(fromR, fromC, r, c, targetBoard)) attackers.push({ r: fromR, c: fromC, piece });
+    }
+  }
+  return attackers;
+}
+
+function applyUciToBoard(uci, sourceBoard = board) {
+  const move = uciToMove(uci);
+  if (!move) return null;
+  const piece = sourceBoard[move.fromR]?.[move.fromC];
+  if (!piece) return null;
+  const nextBoard = cloneBoard(sourceBoard);
+  const captured = nextBoard[move.toR][move.toC];
+  nextBoard[move.toR][move.toC] = piece;
+  nextBoard[move.fromR][move.fromC] = null;
+  return { move, piece, captured, nextBoard };
+}
+
+function highestThreatFrom(r, c, mover, targetBoard = board) {
+  const enemy = oppositeColor(mover);
+  let best = null;
+  for (let targetR = 0; targetR < 10; targetR += 1) {
+    for (let targetC = 0; targetC < 9; targetC += 1) {
+      const piece = targetBoard[targetR][targetC];
+      if (colorOf(piece) !== enemy) continue;
+      if (!attacksSquare(r, c, targetR, targetC, targetBoard)) continue;
+      const value = pieceValue(piece);
+      if (!best || value > best.value) best = { r: targetR, c: targetC, piece, value };
+    }
+  }
+  return best;
+}
+
+function pinnedPieceByLine(piece, r, c, mover, targetBoard = board) {
+  const kind = piece?.toLowerCase();
+  if (kind !== "r" && kind !== "k") return null;
+  const enemyKing = findKing(oppositeColor(mover), targetBoard);
+  if (!enemyKing || (enemyKing.r !== r && enemyKing.c !== c)) return null;
+  const between = piecesBetween({ r, c }, enemyKing, targetBoard);
+  if (between.length === 1 && colorOf(between[0].piece) === oppositeColor(mover)) return between[0];
+  return null;
+}
+
 function squareToUci(r, c) {
   return `${String.fromCharCode(97 + c)}${9 - r}`;
 }
@@ -1089,12 +1599,63 @@ function moveLabel(record) {
   return `${colorLabel(record.side)} ${pieceLabel(record.piece)} ${squareToUci(record.fromR, record.fromC)}-${squareToUci(record.toR, record.toC)}`;
 }
 
+function displayedMoveLabel(record) {
+  return lang === "zh" ? (record.notation || moveLabel(record)) : moveLabel(record);
+}
+
+function notationNumber(value, color) {
+  return color === "red" ? NOTATION_NUMBERS[value] : String(value);
+}
+
+function notationFile(c, color) {
+  return notationNumber(color === "red" ? 9 - c : c + 1, color);
+}
+
+function sameFilePieceRows(sourceBoard, piece, file) {
+  const rows = [];
+  for (let r = 0; r < 10; r += 1) {
+    if (sourceBoard[r][file] === piece) rows.push(r);
+  }
+  return rows;
+}
+
+function notationPrefix(record, sourceBoard) {
+  const rows = sameFilePieceRows(sourceBoard, record.piece, record.fromC);
+  if (rows.length !== 2) return `${NOTATION_PIECES[record.piece] || record.piece}${notationFile(record.fromC, record.side)}`;
+  const frontRow = record.side === "red" ? Math.min(...rows) : Math.max(...rows);
+  return `${record.fromR === frontRow ? "前" : "后"}${NOTATION_PIECES[record.piece] || record.piece}`;
+}
+
+function xiangqiMoveNotation(record, sourceBoard) {
+  const pieceKind = record.piece.toLowerCase();
+  const prefix = notationPrefix(record, sourceBoard);
+  const isHorizontal = record.fromR === record.toR;
+  const isForward = record.side === "red" ? record.toR < record.fromR : record.toR > record.fromR;
+  if (isHorizontal) return `${prefix}平${notationFile(record.toC, record.side)}`;
+  const verb = isForward ? "进" : "退";
+  const straightMover = pieceKind === "r" || pieceKind === "c" || pieceKind === "k" || pieceKind === "p";
+  const suffix = straightMover && record.fromC === record.toC
+    ? notationNumber(Math.abs(record.toR - record.fromR), record.side)
+    : notationFile(record.toC, record.side);
+  return `${prefix}${verb}${suffix}`;
+}
+
 function moveLabelFromBoard(uci, sourceBoard, side) {
   const move = uciToMove(uci);
   if (!move) return null;
   const piece = sourceBoard[move.fromR]?.[move.fromC];
   if (!piece) return uci;
-  return `${colorLabel(side)} ${pieceLabel(piece)} ${squareToUci(move.fromR, move.fromC)}-${squareToUci(move.toR, move.toC)}`;
+  if (lang !== "zh") {
+    return `${colorLabel(side)} ${pieceLabel(piece)} ${squareToUci(move.fromR, move.fromC)}-${squareToUci(move.toR, move.toC)}`;
+  }
+  return xiangqiMoveNotation({
+    fromR: move.fromR,
+    fromC: move.fromC,
+    toR: move.toR,
+    toC: move.toC,
+    piece,
+    side,
+  }, sourceBoard);
 }
 
 function recordToUci(record) {
@@ -1179,6 +1740,370 @@ function downloadPgn() {
   URL.revokeObjectURL(url);
 }
 
+function loadGameLibrary() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GAME_LIBRARY_KEY) || "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter(item => item && typeof item.id === "string" && typeof item.pgn === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveGameLibrary(games) {
+  localStorage.setItem(GAME_LIBRARY_KEY, JSON.stringify(games.slice(0, GAME_LIBRARY_LIMIT)));
+}
+
+function libraryFilterState() {
+  return {
+    query: librarySearchInput.value,
+    result: libraryResultFilter.value,
+    player: libraryPlayerFilter.value,
+    event: libraryEventFilter.value,
+    year: libraryYearFilter.value,
+    opening: libraryOpeningFilter.value,
+    favorite: libraryFavoriteFilter.checked,
+  };
+}
+
+function hasLibraryFilters(filters = libraryFilterState()) {
+  return Object.values(filters).some(value => typeof value === "boolean" ? value : String(value || "").trim());
+}
+
+function librarySearchText(game) {
+  return [
+    game.searchText,
+    game.title,
+    game.details,
+    game.event,
+    game.red,
+    game.black,
+    game.redTeam,
+    game.blackTeam,
+    game.date,
+    game.result,
+    game.opening,
+    game.sourceName,
+  ].join(" ").toLowerCase();
+}
+
+function matchesLocalLibraryFilters(game, filters) {
+  const query = String(filters.query || "").trim().toLowerCase();
+  if (query && !librarySearchText(game).includes(query)) return false;
+  if (filters.favorite && !game.favorite) return false;
+  if (filters.result && game.result !== filters.result) return false;
+
+  const event = String(filters.event || "").trim().toLowerCase();
+  if (event && !String(game.event || game.details || "").toLowerCase().includes(event)) return false;
+
+  const player = String(filters.player || "").trim().toLowerCase();
+  if (player) {
+    const haystack = [game.red, game.black, game.redTeam, game.blackTeam, game.title].join(" ").toLowerCase();
+    if (!haystack.includes(player)) return false;
+  }
+
+  const year = String(filters.year || "").trim();
+  if (year && !String(game.date || "").startsWith(year)) return false;
+
+  const opening = String(filters.opening || "").trim().toLowerCase();
+  if (opening && !String(game.opening || game.details || "").toLowerCase().includes(opening)) return false;
+
+  return true;
+}
+
+function gameLibraryEntryFromPgn(pgn, fallbackTitle = "Xiangqi Game") {
+  const red = pgnHeaderValue(pgn, "Red") || pgnHeaderValue(pgn, "White");
+  const black = pgnHeaderValue(pgn, "Black");
+  const redTeam = pgnHeaderValue(pgn, "RedTeam");
+  const blackTeam = pgnHeaderValue(pgn, "BlackTeam");
+  const event = pgnHeaderValue(pgn, "Event") || pgnHeaderValue(pgn, "Game") || fallbackTitle;
+  const date = pgnHeaderValue(pgn, "Date");
+  const result = pgnHeaderValue(pgn, "Result") || "*";
+  const opening = pgnHeaderValue(pgn, "Opening");
+  const moves = pgnParseText(pgn).length;
+  const title = red && black ? `${red} vs ${black}` : event;
+  const details = [event, date, result, opening && opening !== "-" ? opening : "", text("movesCount", moves)].filter(Boolean).join(" · ");
+  const searchText = [title, details, event, red, black, redTeam, blackTeam, date, result, opening].join(" ").toLowerCase();
+  return {
+    id: crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title,
+    details,
+    pgn,
+    event,
+    red,
+    black,
+    redTeam,
+    blackTeam,
+    date,
+    result,
+    opening,
+    moves,
+    searchText,
+    favorite: false,
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function currentPgnForLibrary() {
+  if (modeSelect.value === "pgn" && pgnSourceText) return pgnSourceText;
+  if (history.length) return buildPgn();
+  return "";
+}
+
+let libraryRenderRequestId = 0;
+let libraryRenderTimer = 0;
+
+function librarySectionTitle(label) {
+  const heading = document.createElement("h3");
+  heading.className = "library-section-title";
+  heading.textContent = label;
+  return heading;
+}
+
+function libraryGameRow(game, source, canDelete = false) {
+  const row = document.createElement("article");
+  row.className = "library-game";
+  row.dataset.source = source;
+  row.classList.toggle("favorite", Boolean(game.favorite));
+  const meta = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = game.title || text("gameLibrary");
+  const details = document.createElement("span");
+  const moveCount = game.moves ?? (game.pgn ? pgnParseText(game.pgn).length : 0);
+  details.textContent = [game.details || text("movesCount", moveCount), game.sourceName].filter(Boolean).join(" · ");
+  meta.append(title, details);
+
+  const actions = document.createElement("div");
+  actions.className = "library-game-actions";
+  const favorite = document.createElement("button");
+  favorite.type = "button";
+  favorite.className = "library-favorite-btn";
+  favorite.dataset.action = "favorite";
+  favorite.dataset.source = source;
+  favorite.dataset.id = game.id;
+  favorite.dataset.favorite = game.favorite ? "false" : "true";
+  favorite.textContent = game.favorite ? "★" : "☆";
+  favorite.title = game.favorite ? text("unfavoriteGame") : text("favoriteGame");
+  favorite.setAttribute("aria-label", favorite.title);
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.dataset.action = "open";
+  open.dataset.source = source;
+  open.dataset.id = game.id;
+  open.textContent = text("openGame");
+  actions.append(favorite, open);
+
+  if (canDelete) {
+    const del = document.createElement("button");
+    del.type = "button";
+    del.dataset.action = "delete";
+    del.dataset.source = source;
+    del.dataset.id = game.id;
+    del.className = "danger-btn";
+    del.textContent = text("deleteGame");
+    actions.append(del);
+  }
+
+  row.append(meta, actions);
+  return row;
+}
+
+function appendLibrarySection(fragment, title, games, source, canDelete = false) {
+  if (!games.length) return false;
+  fragment.append(librarySectionTitle(title));
+  for (const game of games) fragment.append(libraryGameRow(game, source, canDelete));
+  return true;
+}
+
+async function renderGameLibrary() {
+  const requestId = ++libraryRenderRequestId;
+  const filters = libraryFilterState();
+  const allLocalGames = loadGameLibrary();
+  const localGames = allLocalGames.filter(game => matchesLocalLibraryFilters(game, filters));
+  let indexedResult = null;
+  let indexedError = null;
+
+  if (window.api?.pgnLibrary?.search) {
+    try {
+      indexedResult = await window.api.pgnLibrary.search({ ...filters, limit: 100 });
+    } catch (error) {
+      indexedError = error;
+    }
+  }
+  if (requestId !== libraryRenderRequestId) return;
+
+  const fragment = document.createDocumentFragment();
+  const hasLocal = appendLibrarySection(fragment, text("localSavedGames"), localGames, "local", true);
+  const indexedGames = Array.isArray(indexedResult?.games) ? indexedResult.games : [];
+  const hasIndexed = appendLibrarySection(fragment, text("indexedGames"), indexedGames, "indexed", false);
+
+  if (!hasLocal && !hasIndexed) {
+    const empty = document.createElement("p");
+    empty.className = "library-empty";
+    empty.textContent = hasLibraryFilters(filters) ? text("noLibraryMatches") : text("noSavedGames");
+    fragment.append(empty);
+  }
+
+  libraryList.replaceChildren(fragment);
+  const counts = [];
+  if (allLocalGames.length || hasLibraryFilters(filters)) {
+    counts.push(text("localLibrarySearchCount", localGames.length, allLocalGames.length));
+  }
+  if (indexedResult) {
+    counts.push(text("librarySearchCount", indexedGames.length, indexedResult.total || 0));
+  }
+  libraryCount.textContent = counts.join(" · ");
+  if (indexedError) libraryStatus.textContent = text("couldNotReadFile", indexedError?.message || "unknown");
+}
+
+function scheduleRenderGameLibrary() {
+  window.clearTimeout(libraryRenderTimer);
+  libraryRenderTimer = window.setTimeout(() => {
+    void renderGameLibrary();
+  }, 160);
+}
+
+function clearLibraryFilters() {
+  librarySearchInput.value = "";
+  libraryResultFilter.value = "";
+  libraryPlayerFilter.value = "";
+  libraryEventFilter.value = "";
+  libraryYearFilter.value = "";
+  libraryOpeningFilter.value = "";
+  libraryFavoriteFilter.checked = false;
+  void renderGameLibrary();
+}
+
+async function importPgnLibraryFile() {
+  if (!window.api?.pgnLibrary?.importFile) {
+    libraryStatus.textContent = text("libraryImportUnavailable");
+    return;
+  }
+  libraryImportPgnBtn.disabled = true;
+  libraryStatus.textContent = text("indexingLibrary");
+  try {
+    const result = await window.api.pgnLibrary.importFile();
+    if (!result) {
+      libraryStatus.textContent = "";
+      return;
+    }
+    libraryStatus.textContent = text("importedLibrary", result.count || 0, result.source?.name || text("pgnFile"));
+    await renderGameLibrary();
+  } catch (error) {
+    libraryStatus.textContent = text("couldNotReadFile", error?.message || "unknown");
+  } finally {
+    libraryImportPgnBtn.disabled = false;
+  }
+}
+
+function setLocalLibraryFavorite(id, favorite) {
+  const games = loadGameLibrary();
+  const updated = games.map(game => {
+    if (game.id !== id) return game;
+    const next = { ...game, favorite: Boolean(favorite) };
+    if (next.favorite) {
+      next.favoriteAt = new Date().toISOString();
+    } else {
+      delete next.favoriteAt;
+    }
+    return next;
+  });
+  saveGameLibrary(updated);
+}
+
+async function toggleLibraryFavorite(source, id, favorite) {
+  try {
+    if (source === "indexed") {
+      if (!window.api?.pgnLibrary?.setFavorite) {
+        libraryStatus.textContent = text("libraryImportUnavailable");
+        return;
+      }
+      await window.api.pgnLibrary.setFavorite(id, favorite);
+    } else {
+      setLocalLibraryFavorite(id, favorite);
+    }
+    libraryStatus.textContent = text("favoriteSaved");
+    await renderGameLibrary();
+  } catch (error) {
+    libraryStatus.textContent = text("couldNotReadFile", error?.message || "unknown");
+  }
+}
+
+function openGameLibrary() {
+  libraryOverlay.hidden = false;
+  libraryStatus.textContent = "";
+  void renderGameLibrary();
+}
+
+function closeGameLibrary() {
+  libraryOverlay.hidden = true;
+}
+
+function saveCurrentGameToLibrary() {
+  const pgn = currentPgnForLibrary();
+  if (!pgn) {
+    libraryStatus.textContent = text("noGameToSave");
+    return;
+  }
+  const entry = gameLibraryEntryFromPgn(pgn, pgnSourceTitle || "Xiangqi Game");
+  const games = [entry, ...loadGameLibrary()].slice(0, GAME_LIBRARY_LIMIT);
+  try {
+    saveGameLibrary(games);
+  } catch (error) {
+    libraryStatus.textContent = text("gameSaveFailed", error?.message || "unknown");
+    return;
+  }
+  libraryStatus.textContent = text("gameSaved", entry.title);
+  void renderGameLibrary();
+  renderHistory();
+}
+
+function openLibraryGame(id) {
+  const game = loadGameLibrary().find(item => item.id === id);
+  if (!game) return;
+  closeGameLibrary();
+  hideStartupPicker();
+  modeSelect.value = "pgn";
+  modeSelect.dispatchEvent(new Event("change"));
+  pgnLoadText(game.pgn, { title: game.title });
+  pgnNav.hidden = false;
+}
+
+async function openIndexedLibraryGame(id) {
+  if (!window.api?.pgnLibrary?.readGame) {
+    libraryStatus.textContent = text("libraryImportUnavailable");
+    return;
+  }
+  libraryStatus.textContent = text("readFile", text("pgnFile"));
+  try {
+    const result = await window.api.pgnLibrary.readGame(id);
+    hideStartupPicker();
+    modeSelect.value = "pgn";
+    modeSelect.dispatchEvent(new Event("change"));
+    const title = result?.game?.title || text("pgnFile");
+    if (pgnLoadText(String(result?.text || ""), { title })) {
+      closeGameLibrary();
+      pgnNav.hidden = false;
+    } else {
+      libraryStatus.textContent = text("noMovesFound");
+    }
+  } catch (error) {
+    libraryStatus.textContent = text("couldNotReadFile", error?.message || "unknown");
+  }
+}
+
+function deleteLibraryGame(id) {
+  const games = loadGameLibrary();
+  const game = games.find(item => item.id === id);
+  if (!game) return;
+  if (!confirm(text("confirmDeleteGame", game.title || text("gameLibrary")))) return;
+  saveGameLibrary(games.filter(item => item.id !== id));
+  libraryStatus.textContent = text("gameDeleted");
+  void renderGameLibrary();
+}
+
 function shouldFlipBoard() {
   if (modeSelect.value === "online" && online && online.myColor === "black") return true;
   if (modeSelect.value === "ai" && playerSide.value === "black") return true;
@@ -1186,9 +2111,65 @@ function shouldFlipBoard() {
   return false;
 }
 
+function renderFileLabels(flipped) {
+  if (lang !== "zh") {
+    const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
+    topFileLabels.forEach((label, index) => { label.textContent = files[index] || ""; });
+    bottomFileLabels.forEach((label, index) => { label.textContent = files[index] || ""; });
+    return;
+  }
+  const blackFiles = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  const redFiles = ["九", "八", "七", "六", "五", "四", "三", "二", "一"];
+  const top = flipped ? redFiles : blackFiles;
+  const bottom = flipped ? blackFiles : redFiles;
+  topFileLabels.forEach((label, index) => { label.textContent = top[index] || ""; });
+  bottomFileLabels.forEach((label, index) => { label.textContent = bottom[index] || ""; });
+}
+
+function sameLine(a, b) {
+  return a.length === b.length && a.every((move, index) => move === b[index]);
+}
+
+function currentOpeningLine() {
+  return history.map(recordToUci);
+}
+
+function findOpeningEntry(line) {
+  return OPENING_BOOK.find(entry => sameLine(entry.line, line)) || null;
+}
+
+function openingMoveNameForLine(line) {
+  if (!line.length) return "";
+  const previousEntry = findOpeningEntry(line.slice(0, -1));
+  const lastUci = line[line.length - 1];
+  const bookMove = previousEntry?.moves?.find(move => move.uci === lastUci);
+  return bookMove ? (bookMove.name.zh || localized(bookMove.name)) : "";
+}
+
+function showOpeningOverlay(name) {
+  if (!name || modeSelect.value === "setup" || modeSelect.value === "trainer" || modeSelect.value === "pgn") return;
+  const id = ++openingOverlayId;
+  openingOverlayText = name;
+  window.setTimeout(() => {
+    if (openingOverlayId !== id) return;
+    openingOverlayText = "";
+    renderBoard();
+  }, 1800);
+}
+
+function renderOpeningOverlay() {
+  if (!openingOverlayText) return;
+  const overlay = document.createElement("div");
+  overlay.className = "opening-name-overlay";
+  overlay.textContent = openingOverlayText;
+  boardEl.append(overlay);
+}
+
 function renderBoard() {
   const flipped = shouldFlipBoard();
+  renderFileLabels(flipped);
   boardEl.classList.toggle("flipped", flipped);
+  boardEl.classList.toggle("setup-mode", modeSelect.value === "setup");
   boardEl.parentElement?.classList.toggle("flipped", flipped);
   boardEl.innerHTML = `
     <svg class="board-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
@@ -1240,6 +2221,11 @@ function renderBoard() {
         square.append(pieceEl);
       }
       square.addEventListener("click", () => onSquare(r, c));
+      square.addEventListener("contextmenu", event => {
+        if (modeSelect.value !== "setup") return;
+        event.preventDefault();
+        openSetupPieceMenu(event, r, c);
+      });
       boardEl.append(square);
     }
   }
@@ -1248,17 +2234,212 @@ function renderBoard() {
     turnPill.classList.toggle("black", turn === "black");
   }
   fenText.textContent = boardToFen();
+  renderOpeningOverlay();
 }
 
 function renderHistory() {
   moveList.innerHTML = "";
-  for (const record of history) {
+  if (modeSelect.value === "pgn" && pgnMoves.length) {
+    renderPgnReviewHistory();
+    return;
+  }
+  for (let i = 0; i < history.length; i += 2) {
+    const red = history[i];
+    const black = history[i + 1];
     const li = document.createElement("li");
-    li.textContent = moveLabel(record);
+    const moveNo = Math.floor(i / 2) + 1;
+    const redText = red ? displayedMoveLabel(red) : "";
+    const blackText = black ? displayedMoveLabel(black) : "";
+    li.innerHTML = `<span class="move-no">${moveNo}.</span><span class="move-red">${redText}</span><span class="move-black">${blackText}</span>`;
     moveList.append(li);
   }
   moveList.scrollTop = moveList.scrollHeight;
   downloadPgnBtn.hidden = history.length === 0 || modeSelect.value === "pgn";
+  saveGameBtn.hidden = modeSelect.value === "setup" || (modeSelect.value === "pgn" ? !pgnSourceText : history.length === 0);
+}
+
+function prepareEditablePosition(nextBoard = board, nextTurn = turn) {
+  board = cloneBoard(nextBoard);
+  turn = nextTurn;
+  selected = null;
+  legalTargets = [];
+  history = [];
+  lastMove = null;
+  gameResult = null;
+  busy = false;
+  lastUserRecommendationText = "";
+  currentEval = 0;
+  turnPill.classList.remove("winner");
+  moveScore.textContent = modeSelect.value === "setup" ? text("setupReady") : text("moveToSeeScore");
+  pvLine.textContent = "";
+  pvLine.hidden = true;
+  updateScore(0);
+}
+
+function sameSquare(a, b) {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+function setupPieceAllowedSquares(piece) {
+  const color = colorOf(piece);
+  const lower = piece.toLowerCase();
+  if (lower === "k") return color === "red"
+    ? [[7, 3], [7, 4], [7, 5], [8, 3], [8, 4], [8, 5], [9, 3], [9, 4], [9, 5]]
+    : [[0, 3], [0, 4], [0, 5], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5]];
+  if (lower === "a") return color === "red"
+    ? [[7, 3], [7, 5], [8, 4], [9, 3], [9, 5]]
+    : [[0, 3], [0, 5], [1, 4], [2, 3], [2, 5]];
+  if (lower === "b") return color === "red"
+    ? [[5, 2], [5, 6], [7, 0], [7, 4], [7, 8], [9, 2], [9, 6]]
+    : [[0, 2], [0, 6], [2, 0], [2, 4], [2, 8], [4, 2], [4, 6]];
+  return null;
+}
+
+function canPawnOccupy(piece, r, c) {
+  if (piece === "P") {
+    if (r <= 4) return true;
+    return (r === 5 || r === 6) && c % 2 === 0;
+  }
+  if (piece === "p") {
+    if (r >= 5) return true;
+    return (r === 3 || r === 4) && c % 2 === 0;
+  }
+  return false;
+}
+
+function countSetupPieces(piece, ignoreR, ignoreC) {
+  let count = 0;
+  for (let r = 0; r < 10; r += 1) {
+    for (let c = 0; c < 9; c += 1) {
+      if (r === ignoreR && c === ignoreC) continue;
+      if (board[r][c] === piece) count += 1;
+    }
+  }
+  return count;
+}
+
+function setupPlacementError(piece, r, c) {
+  if (!piece) return "";
+  const lower = piece.toLowerCase();
+  const allowedSquares = setupPieceAllowedSquares(piece);
+  if (allowedSquares && !allowedSquares.some(square => sameSquare(square, [r, c]))) {
+    return text("setupIllegalSquare", pieceLabel(piece), squareToUci(r, c));
+  }
+  if (lower === "p" && !canPawnOccupy(piece, r, c)) {
+    return text("setupIllegalSquare", pieceLabel(piece), squareToUci(r, c));
+  }
+  const max = SETUP_MAX_PIECES[lower];
+  if (max && countSetupPieces(piece, r, c) >= max) {
+    return text("setupTooManyPieces", colorLabel(colorOf(piece)), pieceLabel(piece), max);
+  }
+  return "";
+}
+
+function setupBoardError() {
+  for (let r = 0; r < 10; r += 1) {
+    for (let c = 0; c < 9; c += 1) {
+      const piece = board[r][c];
+      const error = setupPlacementError(piece, r, c);
+      if (error) return error;
+    }
+  }
+  if (!findKing("red") || !findKing("black")) return text("setupNeedsKings");
+  if (kingsFacing(board)) return text("setupKingsFacing");
+  return "";
+}
+
+function applySetupPiece(r, c, piece) {
+  const error = setupPlacementError(piece, r, c);
+  if (error) {
+    moveScore.textContent = error;
+    return;
+  }
+  board[r][c] = piece || null;
+  turn = setupTurnSelect.value === "black" ? "black" : "red";
+  prepareEditablePosition(board, turn);
+  closeSetupPieceMenu();
+  renderBoard();
+  renderHistory();
+}
+
+function closeSetupPieceMenu() {
+  setupMenuSquare = null;
+  setupPieceMenu.hidden = true;
+  setupPieceMenu.innerHTML = "";
+}
+
+function openSetupPieceMenu(event, r, c) {
+  setupMenuSquare = { r, c };
+  setupPieceMenu.innerHTML = "";
+  const entries = ["", ...SETUP_PIECE_CODES];
+  for (const code of entries) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = code ? `setup-piece-option ${colorOf(code)}` : "setup-piece-option empty";
+    button.textContent = code ? PIECES[code] : text("emptySquare");
+    const error = setupPlacementError(code, r, c);
+    button.disabled = !!error;
+    button.title = error || (code ? `${colorLabel(colorOf(code))} ${pieceLabel(code)}` : text("emptySquare"));
+    button.addEventListener("click", () => {
+      if (!setupMenuSquare) return;
+      applySetupPiece(setupMenuSquare.r, setupMenuSquare.c, code);
+    });
+    setupPieceMenu.append(button);
+  }
+  setupPieceMenu.hidden = false;
+  setupPieceMenu.style.left = `${event.clientX}px`;
+  setupPieceMenu.style.top = `${event.clientY}px`;
+  requestAnimationFrame(() => {
+    const rect = setupPieceMenu.getBoundingClientRect();
+    const left = Math.min(event.clientX, window.innerWidth - rect.width - 8);
+    const top = Math.min(event.clientY, window.innerHeight - rect.height - 8);
+    setupPieceMenu.style.left = `${Math.max(8, left)}px`;
+    setupPieceMenu.style.top = `${Math.max(8, top)}px`;
+  });
+}
+
+function setupSquareClick(r, c) {
+  applySetupPiece(r, c, "");
+}
+
+function setupStartPosition() {
+  const parsed = parseFen(START_FEN);
+  modeSelect.value = "setup";
+  setupTurnSelect.value = parsed.turn;
+  prepareEditablePosition(parsed.board, parsed.turn);
+  renderSetupPanel();
+  renderBoard();
+  renderHistory();
+}
+
+function setupClearBoard() {
+  modeSelect.value = "setup";
+  setupTurnSelect.value = "red";
+  prepareEditablePosition(Array.from({ length: 10 }, () => Array(9).fill(null)), "red");
+  renderSetupPanel();
+  renderBoard();
+  renderHistory();
+}
+
+function playSetupPosition() {
+  turn = setupTurnSelect.value === "black" ? "black" : "red";
+  prepareEditablePosition(board, turn);
+  const error = setupBoardError();
+  if (error) {
+    moveScore.textContent = error;
+    renderBoard();
+    renderHistory();
+    return;
+  }
+  modeSelect.value = "human";
+  setupPanel.hidden = true;
+  qs("#clocks").hidden = false;
+  undoBtn.disabled = false;
+  moveScore.textContent = text("setupApplied");
+  renderBoard();
+  renderHistory();
+  startClock();
+  evaluatePosition();
 }
 
 function canHumanMove() {
@@ -1277,6 +2458,10 @@ function canHumanMove() {
 }
 
 async function onSquare(r, c) {
+  if (modeSelect.value === "setup") {
+    setupSquareClick(r, c);
+    return;
+  }
   if (!canHumanMove()) return;
   const piece = board[r][c];
   if (selected && legalTargets.some(move => move.r === r && move.c === c)) {
@@ -1424,7 +2609,8 @@ function clockTimeout(loser) {
 function applyMove(fromR, fromC, toR, toC, source) {
   const piece = board[fromR][fromC];
   const captured = board[toR][toC];
-  history.push({ fromR, fromC, toR, toC, piece, captured, side: turn, source, beforeEval: currentEval });
+  const record = { fromR, fromC, toR, toC, piece, captured, side: turn, source, beforeEval: currentEval };
+  history.push({ ...record, notation: xiangqiMoveNotation(record, board) });
   board[toR][toC] = piece;
   board[fromR][fromC] = null;
   lastMove = { fromR, fromC, toR, toC };
@@ -1450,6 +2636,7 @@ async function makeMove(fromR, fromC, toR, toC, source = "human") {
     : Promise.resolve(null);
   const playedUci = `${squareToUci(fromR, fromC)}${squareToUci(toR, toC)}`;
   applyMove(fromR, fromC, toR, toC, source);
+  showOpeningOverlay(openingMoveNameForLine(currentOpeningLine()));
   renderBoard();
   renderHistory();
 
@@ -1685,8 +2872,55 @@ function moveQualityText(grade) {
   return "";
 }
 
+function coachMoveReasons(uci, sourceBoard = board, mover = turn) {
+  const applied = applyUciToBoard(uci, sourceBoard);
+  if (!applied) return [];
+  const { move, piece, captured, nextBoard } = applied;
+  const enemy = oppositeColor(mover);
+  const reasons = [];
+
+  if (isInCheck(enemy, nextBoard)) reasons.push(text("coachCheck"));
+
+  if (captured) {
+    reasons.push(text("coachCapture", pieceLabel(captured)));
+    const recapture = attackersToSquare(move.toR, move.toC, enemy, nextBoard);
+    if (!recapture.length) {
+      reasons.push(text("coachFreeCapture"));
+    } else {
+      const diff = pieceValue(captured) - pieceValue(piece);
+      if (diff > 80) reasons.push(text("coachTradeWin", pieceLabel(captured), pieceLabel(piece)));
+      else if (diff >= -40) reasons.push(text("coachTradeEven"));
+      else reasons.push(text("coachTradeRisk"));
+    }
+  }
+
+  const threat = highestThreatFrom(move.toR, move.toC, mover, nextBoard);
+  if (threat && threat.piece.toLowerCase() !== "k" && (!captured || threat.value >= pieceValue(captured))) {
+    reasons.push(text("coachThreat", pieceLabel(threat.piece), squareToUci(threat.r, threat.c)));
+  }
+
+  const pin = pinnedPieceByLine(piece, move.toR, move.toC, mover, nextBoard);
+  if (pin) reasons.push(text("coachPin", pieceLabel(pin.piece)));
+
+  const protectors = attackersToSquare(move.toR, move.toC, mover, nextBoard, { r: move.toR, c: move.toC });
+  if (protectors.length) reasons.push(text("coachProtected", protectors.length));
+
+  const beforeMobility = pseudoMoves(move.fromR, move.fromC, sourceBoard).length;
+  const afterMobility = legalMovesOnBoard(move.toR, move.toC, nextBoard).length;
+  if (!captured && afterMobility >= beforeMobility + 2) reasons.push(text("coachMobility", pieceLabel(piece)));
+
+  return [...new Set(reasons)].slice(0, 4);
+}
+
+function coachMoveText(uci, sourceBoard = board, mover = turn) {
+  const reasons = coachMoveReasons(uci, sourceBoard, mover);
+  if (!reasons.length) return `${text("coachIntro")}\n- ${text("coachNoClear")}`;
+  return `${text("coachIntro")}\n- ${reasons.join("\n- ")}`;
+}
+
 function showRecommendations(moves, beforeBoard, mover, playedUci, playedScore = null) {
   const quality = moveQualityText(gradePlayedMove(moves, mover, playedUci, playedScore));
+  const best = moves.find(m => m.move);
   const recLines = moves
     .filter(m => m.move)
     .slice(0, 3)
@@ -1697,7 +2931,8 @@ function showRecommendations(moves, beforeBoard, mover, playedUci, playedScore =
       return `${i + 1}. ${label} (${scoreText})${matched}`;
     });
   const recommendations = recLines.length ? text("recommendations", recLines.join("\n")) : "";
-  lastUserRecommendationText = [quality, recommendations].filter(Boolean).join("\n\n");
+  const coach = best?.move ? coachMoveText(best.move, beforeBoard, mover) : "";
+  lastUserRecommendationText = [quality, recommendations, coach].filter(Boolean).join("\n\n");
   moveScore.textContent = lastUserRecommendationText;
 }
 
@@ -1767,9 +3002,103 @@ function engineMoveScore(move, mover) {
   return mover === "red" ? Number(move.score) : -Number(move.score);
 }
 
-const AI_MIN_RANDOM_SCORE_CP = -100;
+const AI_LEVELS = {
+  beginner: {
+    movetime: 160,
+    count: 5,
+    maxLossCp: 650,
+    minScoreCp: -700,
+    temperatureCp: 260,
+    blunderChance: 0.28,
+    randomLegalChance: 0.10,
+    blunderExtraCp: 700,
+  },
+  amateur: {
+    movetime: 260,
+    count: 5,
+    maxLossCp: 320,
+    minScoreCp: -300,
+    temperatureCp: 150,
+    blunderChance: 0.13,
+    randomLegalChance: 0.03,
+    blunderExtraCp: 420,
+  },
+  county: {
+    movetime: 520,
+    count: 6,
+    maxLossCp: 150,
+    minScoreCp: -120,
+    temperatureCp: 85,
+    blunderChance: 0.04,
+    randomLegalChance: 0,
+    blunderExtraCp: 180,
+  },
+  master: {
+    movetime: 950,
+    count: 8,
+    maxLossCp: 45,
+    minScoreCp: -40,
+    temperatureCp: 26,
+    blunderChance: 0,
+    randomLegalChance: 0,
+    blunderExtraCp: 0,
+  },
+};
+
+function aiProfile() {
+  return AI_LEVELS[aiLevelSelect.value] || AI_LEVELS.amateur;
+}
+
+function syncAiLevel(value) {
+  const next = AI_LEVELS[value] ? value : "amateur";
+  aiLevelSelect.value = next;
+  startupAiLevelSelect.value = next;
+  try { localStorage.setItem("xiangqi.aiLevel", next); } catch { /* ignore */ }
+}
+
+function loadAiLevel() {
+  try {
+    const saved = localStorage.getItem("xiangqi.aiLevel");
+    if (saved && AI_LEVELS[saved]) return saved;
+  } catch { /* ignore */ }
+  return "amateur";
+}
+
+function legalUciMovesFor(color) {
+  const previousTurn = turn;
+  turn = color;
+  try {
+    const moves = [];
+    for (let r = 0; r < 10; r += 1) {
+      for (let c = 0; c < 9; c += 1) {
+        if (colorOf(board[r][c]) !== color) continue;
+        for (const target of legalMoves(r, c)) moves.push(coordsToUci(r, c, target.r, target.c));
+      }
+    }
+    return moves;
+  } finally {
+    turn = previousTurn;
+  }
+}
+
+function weightedRandomMove(candidates, profile) {
+  const temperature = Math.max(1, profile.temperatureCp);
+  const weights = candidates.map(candidate => {
+    const loss = Math.max(0, candidate.lossCp || 0);
+    const rankPenalty = Math.max(0, (candidate.rank || 1) - 1) * 0.15;
+    return Math.exp(-loss / temperature) / (1 + rankPenalty);
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let pick = Math.random() * total;
+  for (let i = 0; i < candidates.length; i += 1) {
+    pick -= weights[i];
+    if (pick <= 0) return candidates[i].move;
+  }
+  return candidates.at(-1)?.move || null;
+}
 
 function chooseAiMove(result, mover) {
+  const profile = aiProfile();
   const moves = result?.moves?.length
     ? result.moves
     : (result?.bestMove ? [{ move: result.bestMove, score: result.score, mate: result.mate }] : []);
@@ -1777,7 +3106,11 @@ function chooseAiMove(result, mover) {
     const move = uciToMove(candidate.move);
     return move && board[move.fromR]?.[move.fromC] && colorOf(board[move.fromR][move.fromC]) === mover;
   });
-  if (!legalMoves.length) return result?.bestMove || null;
+  const allLegal = legalUciMovesFor(mover);
+  if (!legalMoves.length) return allLegal[Math.floor(Math.random() * allLegal.length)] || result?.bestMove || null;
+  if (profile.randomLegalChance && Math.random() < profile.randomLegalChance) {
+    return allLegal[Math.floor(Math.random() * allLegal.length)] || legalMoves[0].move;
+  }
 
   const best = legalMoves[0];
   if (best.mate != null) {
@@ -1786,17 +3119,22 @@ function chooseAiMove(result, mover) {
       if (candidate.mate == null) return false;
       return (mover === "red" ? candidate.mate : -candidate.mate) === bestMate;
     });
-    return mateMoves[Math.floor(Math.random() * mateMoves.length)]?.move || best.move;
+    if (bestMate > 0 || !profile.blunderChance || Math.random() >= profile.blunderChance) {
+      return mateMoves[Math.floor(Math.random() * mateMoves.length)]?.move || best.move;
+    }
   }
 
   const bestScore = engineMoveScore(best, mover);
   if (bestScore == null) return best.move;
-  const closeMoves = legalMoves.filter(candidate => {
+  const isBlunder = profile.blunderChance && Math.random() < profile.blunderChance;
+  const maxLossCp = profile.maxLossCp + (isBlunder ? profile.blunderExtraCp : 0);
+  const minScoreCp = profile.minScoreCp - (isBlunder ? profile.blunderExtraCp : 0);
+  const candidates = legalMoves.map(candidate => {
     const score = engineMoveScore(candidate, mover);
-    return score != null && score >= AI_MIN_RANDOM_SCORE_CP && bestScore - score <= 100;
-  });
-  const candidates = closeMoves.length ? closeMoves : [best];
-  return candidates[Math.floor(Math.random() * candidates.length)]?.move || best.move;
+    if (score == null) return null;
+    return { ...candidate, score, lossCp: Math.max(0, bestScore - score) };
+  }).filter(candidate => candidate && candidate.score >= minScoreCp && candidate.lossCp <= maxLossCp);
+  return weightedRandomMove(candidates.length ? candidates : [{ ...best, score: bestScore, lossCp: 0 }], profile) || best.move;
 }
 
 // In Electron, engine work is done in the main process via IPC. In a plain browser
@@ -1837,7 +3175,8 @@ async function maybeAiMove() {
   busy = true;
   statusText.textContent = text("choosingMove");
   try {
-    const result = await enginePost("/api/topmoves", { fen: boardToFen(), depth: Number(depthInput.value) + 1, count: 5 });
+    const profile = aiProfile();
+    const result = await enginePost("/api/topmoves", { fen: boardToFen(), count: profile.count, movetime: profile.movetime });
     const move = uciToMove(chooseAiMove(result, turn));
     if (move && board[move.fromR]?.[move.fromC]) {
       await makeMove(move.fromR, move.fromC, move.toR, move.toC, "engine");
@@ -1890,7 +3229,9 @@ function trainerTopMoveLines() {
       const score = formatRecommendationScore(move, turn);
       return `${index + 1}. ${label} (${score})`;
     });
-  return lines.length ? text("bestLines", lines.join("\n")) : text("noBestLine");
+  const best = trainerState.moves.find(move => move.move);
+  const coach = best?.move ? coachMoveText(best.move, board, turn) : "";
+  return lines.length ? [text("bestLines", lines.join("\n")), coach].filter(Boolean).join("\n\n") : text("noBestLine");
 }
 
 function trainerPromptText() {
@@ -2180,7 +3521,7 @@ function resetGameLocal() {
   renderHistory();
   clearClock();
   // Start the clock for actively-played modes only (not PGN replay, not waiting for an online opponent).
-  if (modeSelect.value === "pgn" || modeSelect.value === "trainer") return;
+  if (modeSelect.value === "pgn" || modeSelect.value === "trainer" || modeSelect.value === "setup") return;
   if (modeSelect.value !== "online" || (online && online.status === "playing")) {
     startClock();
   }
@@ -2194,6 +3535,10 @@ function resetGame() {
   if (modeSelect.value === "trainer") {
     resetGameLocal();
     startTrainer();
+    return;
+  }
+  if (modeSelect.value === "setup") {
+    setupClearBoard();
     return;
   }
   resetGameLocal();
@@ -2825,28 +4170,38 @@ signupBtn.addEventListener("click", async () => {
 depthInput.addEventListener("input", () => {
   depthLabel.textContent = depthInput.value;
 });
+aiLevelSelect.addEventListener("change", () => {
+  syncAiLevel(aiLevelSelect.value);
+});
+startupAiLevelSelect.addEventListener("change", () => {
+  syncAiLevel(startupAiLevelSelect.value);
+});
 languageSelect.addEventListener("change", () => {
   lang = languageSelect.value === "zh" ? "zh" : "en";
   try { localStorage.setItem("xiangqi.language", lang); } catch { /* ignore */ }
   applyLanguage();
+  if (!libraryOverlay.hidden) void renderGameLibrary();
   loadStatus();
 });
 modeSelect.addEventListener("change", () => {
   const isOnline = modeSelect.value === "online";
   const isPgn = modeSelect.value === "pgn";
   const isTrainer = modeSelect.value === "trainer";
+  const isSetup = modeSelect.value === "setup";
   setOnlineMode(isOnline);
   // Hide the clock section in study modes.
-  qs("#clocks").hidden = isPgn || isTrainer;
+  qs("#clocks").hidden = isPgn || isTrainer || isSetup;
   renderTrainerPanel();
-  if (isTrainer) clearClock();
+  renderSetupPanel();
+  renderBoard();
+  if (isTrainer || isSetup) clearClock();
   if (!isOnline && online) {
     onlineLeave();
     closeMatchOverlay();
   } else if (isOnline && (!online || online.role !== "player")) {
     openMatchOverlay();
   }
-  if (!isOnline && !isTrainer) maybeAiMove();
+  if (!isOnline && !isTrainer && !isSetup) maybeAiMove();
 });
 playerSide.addEventListener("change", () => maybeAiMove());
 newGameBtn.addEventListener("click", resetGame);
@@ -2856,10 +4211,59 @@ gameEndNewBtn.addEventListener("click", () => {
 });
 gameEndReviewBtn.addEventListener("click", reviewFinishedGame);
 undoBtn.addEventListener("click", undo);
+saveGameBtn.addEventListener("click", () => {
+  openGameLibrary();
+  saveCurrentGameToLibrary();
+});
+libraryBtn.addEventListener("click", openGameLibrary);
 downloadPgnBtn.addEventListener("click", downloadPgn);
 trainerHintBtn.addEventListener("click", showTrainerHint);
 trainerRevealBtn.addEventListener("click", revealTrainerMove);
 trainerRestartBtn.addEventListener("click", resetGame);
+setupTurnSelect.addEventListener("change", () => {
+  turn = setupTurnSelect.value === "black" ? "black" : "red";
+  selected = null;
+  legalTargets = [];
+  renderBoard();
+});
+setupStartBtn.addEventListener("click", setupStartPosition);
+setupClearBtn.addEventListener("click", setupClearBoard);
+setupPlayBtn.addEventListener("click", playSetupPosition);
+document.addEventListener("pointerdown", event => {
+  if (setupPieceMenu.hidden) return;
+  const target = event.target as Node | null;
+  if (target && setupPieceMenu.contains(target)) return;
+  closeSetupPieceMenu();
+});
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeSetupPieceMenu();
+  if (event.key === "Escape" && !libraryOverlay.hidden) closeGameLibrary();
+});
+libraryOverlayClose.addEventListener("click", closeGameLibrary);
+libraryOverlay.addEventListener("click", event => {
+  if (event.target === libraryOverlay) closeGameLibrary();
+});
+librarySaveCurrentBtn.addEventListener("click", saveCurrentGameToLibrary);
+libraryImportPgnBtn.addEventListener("click", importPgnLibraryFile);
+librarySearchInput.addEventListener("input", scheduleRenderGameLibrary);
+libraryPlayerFilter.addEventListener("input", scheduleRenderGameLibrary);
+libraryEventFilter.addEventListener("input", scheduleRenderGameLibrary);
+libraryYearFilter.addEventListener("input", scheduleRenderGameLibrary);
+libraryOpeningFilter.addEventListener("input", scheduleRenderGameLibrary);
+libraryResultFilter.addEventListener("change", () => void renderGameLibrary());
+libraryFavoriteFilter.addEventListener("change", () => void renderGameLibrary());
+libraryClearFiltersBtn.addEventListener("click", clearLibraryFilters);
+libraryList.addEventListener("click", event => {
+  const btn = (event.target as HTMLElement | null)?.closest("button[data-action]") as HTMLElement | null;
+  if (!btn?.dataset.id) return;
+  if (btn.dataset.action === "favorite") {
+    void toggleLibraryFavorite(btn.dataset.source || "local", btn.dataset.id, btn.dataset.favorite === "true");
+    return;
+  }
+  if (btn.dataset.action === "open" && btn.dataset.source === "indexed") void openIndexedLibraryGame(btn.dataset.id);
+  if (btn.dataset.action === "open" && btn.dataset.source !== "indexed") openLibraryGame(btn.dataset.id);
+  if (btn.dataset.action === "delete" && btn.dataset.source !== "indexed") deleteLibraryGame(btn.dataset.id);
+});
 
 fenCopyBtn.addEventListener("click", async () => {
   try {
@@ -2884,10 +4288,13 @@ exitBtn.addEventListener("click", () => {
   clearClock();
   closeGameEndOverlay();
   closeMatchOverlay();
+  closeGameLibrary();
   closePgnOverlay();
   pgnNav.hidden = true;
   pgnMoves = [];
   pgnIndex = 0;
+  pgnSourceText = "";
+  pgnSourceTitle = "";
   pgnAnalysisCache.clear();
   resetTrainerState();
   trainerPanel.hidden = true;
@@ -2900,8 +4307,11 @@ exitBtn.addEventListener("click", () => {
 let pgnMoves = []; // [{ uci, raw }]
 let pgnIndex = 0;  // 0 = before first move; pgnMoves.length = end of game
 let pgnImportGames = [];
+let pgnReviewRunId = 0;
 const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
 const MAX_PGN_IMPORT_GAMES = 500;
+const PGN_REVIEW_TOP_MOVETIME_MS = 220;
+const PGN_REVIEW_EVAL_MOVETIME_MS = 120;
 
 function iccsToUci(raw) {
   const match = String(raw).trim().match(/^([a-iA-I])([0-9])[-x:]?([a-iA-I])([0-9])$/);
@@ -2964,18 +4374,74 @@ function pgnParseText(pgnText) {
   return moves;
 }
 
+function pgnReplayTo(targetIndex) {
+  const parsed = parseFen(START_FEN);
+  const replayBoard = cloneBoard(parsed.board);
+  let replayTurn = parsed.turn;
+  const records = [];
+  const limit = Math.max(0, Math.min(targetIndex, pgnMoves.length));
+
+  for (let i = 0; i < limit; i += 1) {
+    const moveInfo = pgnMoves[i];
+    const m = uciToMove(moveInfo.uci);
+    if (!m) break;
+    const piece = replayBoard[m.fromR]?.[m.fromC];
+    if (!piece) break;
+
+    const beforeBoard = cloneBoard(replayBoard);
+    const beforeFen = boardToFen(beforeBoard, replayTurn);
+    const captured = replayBoard[m.toR][m.toC];
+    const record = {
+      index: i + 1,
+      raw: moveInfo.raw,
+      uci: moveInfo.uci,
+      fromR: m.fromR,
+      fromC: m.fromC,
+      toR: m.toR,
+      toC: m.toC,
+      piece,
+      captured,
+      side: replayTurn,
+      source: "pgn",
+    };
+    const notation = xiangqiMoveNotation(record, beforeBoard);
+
+    replayBoard[m.toR][m.toC] = piece;
+    replayBoard[m.fromR][m.fromC] = null;
+    replayTurn = replayTurn === "red" ? "black" : "red";
+
+    records.push({
+      ...record,
+      notation,
+      beforeBoard,
+      beforeFen,
+      afterFen: boardToFen(replayBoard, replayTurn),
+    });
+  }
+
+  return { board: replayBoard, turn: replayTurn, records };
+}
+
+function pgnMoveContext(targetIndex) {
+  return pgnReplayTo(targetIndex).records[targetIndex - 1] || null;
+}
+
 function pgnLoadText(pgnText, meta = null) {
   const moves = pgnParseText(pgnText);
   if (!moves.length) {
     pgnStatus.textContent = text("noMovesFound");
     return false;
   }
+  pgnReviewRunId += 1;
+  pgnSourceText = String(pgnText || "");
+  pgnSourceTitle = meta?.title || text("pgnFile");
   pgnMoves = moves;
   pgnIndex = 0;
   pgnAnalysisCache.clear();
   pgnStatus.textContent = meta ? text("loadedGame", meta.title, moves.length) : text("loadedMoves", moves.length);
   pgnApplyPosition();
   pgnNav.hidden = false;
+  startPgnReviewAnalysis();
   return true;
 }
 
@@ -3070,6 +4536,67 @@ async function openPgnFile() {
 // Analysis cache: keyed by the resulting pgnIndex (1-based). cache.get(N) = analysis for move N (i.e. pgnMoves[N-1]).
 const pgnAnalysisCache = new Map();
 
+function reviewAnnotation(grade) {
+  if (grade.quality === "best") return "!";
+  if (grade.lossCp == null) return "";
+  if (grade.lossCp >= 300) return "??";
+  if (grade.lossCp >= 120) return "?";
+  if (grade.lossCp <= 40) return "!";
+  return "";
+}
+
+function pgnReviewMetaText(index) {
+  const entry = pgnAnalysisCache.get(index);
+  if (!entry) return text("reviewWaiting");
+  if (entry.status === "pending") return text("analyzing");
+  if (entry.status === "error") return text("reviewFailedShort");
+  const parts = [];
+  if (entry.annotation) parts.push(entry.annotation);
+  if (entry.lossText) parts.push(text("reviewLossShort", entry.lossText));
+  if (entry.bestLabel) parts.push(text("reviewBestShort", entry.bestLabel));
+  return parts.join(" · ") || entry.playedScoreText || text("noAnalysis");
+}
+
+function pgnReviewMoveButton(record, index) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "review-move-btn";
+  button.dataset.pgnIndex = String(index);
+  if (pgnIndex === index) button.classList.add("current");
+
+  const label = document.createElement("span");
+  label.className = "review-move-label";
+  label.textContent = record ? displayedMoveLabel(record) : (pgnMoves[index - 1]?.raw || "");
+
+  const meta = document.createElement("span");
+  meta.className = "review-move-meta";
+  meta.textContent = pgnReviewMetaText(index);
+
+  button.append(label, meta);
+  return button;
+}
+
+function renderPgnReviewHistory() {
+  const replay = pgnReplayTo(pgnMoves.length);
+  for (let i = 0; i < pgnMoves.length; i += 2) {
+    const li = document.createElement("li");
+    li.className = "review-row";
+    const moveNo = document.createElement("span");
+    moveNo.className = "move-no";
+    moveNo.textContent = `${Math.floor(i / 2) + 1}.`;
+    li.append(moveNo);
+    li.append(pgnReviewMoveButton(replay.records[i], i + 1));
+    if (pgnMoves[i + 1]) {
+      li.append(pgnReviewMoveButton(replay.records[i + 1], i + 2));
+    } else {
+      const empty = document.createElement("span");
+      empty.className = "review-move-empty";
+      li.append(empty);
+    }
+    moveList.append(li);
+  }
+}
+
 function pgnRenderAnalysis() {
   if (pgnIndex === 0) {
     moveScore.textContent = text("noMoveAnalyze");
@@ -3082,73 +4609,102 @@ function pgnRenderAnalysis() {
   }
   if (entry.status === "done") {
     moveScore.textContent = entry.lines.length
-      ? text("recommendations", entry.lines.join("\n"))
+      ? entry.lines.join("\n")
       : text("noAnalysis");
     return;
   }
-  moveScore.textContent = text("analysisFailed", entry.error);
+  moveScore.textContent = text("reviewFailedShort");
 }
 
-async function pgnComputeAnalysis(targetIndex, beforeFen, beforeBoard, mover, playedUci) {
-  if (pgnAnalysisCache.has(targetIndex)) return;
-  const entry: any = { status: "pending", lines: [] };
+async function pgnComputeAnalysis(targetIndex) {
+  if (targetIndex <= 0 || targetIndex > pgnMoves.length) return null;
+  const existing = pgnAnalysisCache.get(targetIndex);
+  if (existing?.promise) return existing.promise;
+  if (existing?.status === "done" || existing?.status === "error") return existing;
+
+  const context = pgnMoveContext(targetIndex);
+  if (!context) return null;
+  const entry: any = { status: "pending", lines: [], runId: pgnReviewRunId };
   pgnAnalysisCache.set(targetIndex, entry);
-  try {
-    const result = await enginePost("/api/topmoves", { fen: beforeFen, depth: Number(depthInput.value) + 1, count: 5 });
-    const moves = result?.moves?.length
-      ? result.moves
-      : (result?.bestMove ? [{ rank: 1, move: result.bestMove, score: result.score, mate: result.mate }] : []);
-    const quality = moveQualityText(gradePlayedMove(moves, mover, playedUci));
-    const recLines = moves
-      .filter(m => m.move)
-      .slice(0, 3)
-      .map((m, i) => {
-        const label = moveLabelFromBoard(m.move, beforeBoard, mover) || m.move;
-        const scoreText = formatRecommendationScore(m, mover);
-        const matched = m.move === playedUci ? " ✓" : "";
-        return `${i + 1}. ${label} (${scoreText})${matched}`;
+
+  entry.promise = (async () => {
+    try {
+      const result = await enginePost("/api/topmoves", {
+        fen: context.beforeFen,
+        count: 4,
+        movetime: PGN_REVIEW_TOP_MOVETIME_MS,
       });
-    entry.lines = [quality, ...recLines].filter(Boolean);
-    entry.status = "done";
-  } catch (e) {
-    entry.status = "error";
-    entry.error = e.message;
+      const afterEval = await enginePost("/api/evaluate", {
+        fen: context.afterFen,
+        movetime: PGN_REVIEW_EVAL_MOVETIME_MS,
+      }).catch(() => null);
+      const moves = result?.moves?.length
+        ? result.moves
+        : (result?.bestMove ? [{ rank: 1, move: result.bestMove, score: result.score, mate: result.mate }] : []);
+      const playedScore = afterEval?.score ?? null;
+      const beforeScore = result?.score ?? null;
+      const grade = gradePlayedMove(moves, context.side, context.uci, playedScore);
+      const best = moves.find(m => m.move) || null;
+      const bestLabel = best?.move ? (moveLabelFromBoard(best.move, context.beforeBoard, context.side) || best.move) : "";
+      const bestScoreText = best ? formatRecommendationScore(best, context.side) : "";
+      const lossText = grade.lossCp != null ? cpLossText(grade.lossCp) : "";
+      const annotation = reviewAnnotation(grade);
+      const recLines = moves
+        .filter(m => m.move)
+        .slice(0, 3)
+        .map((m, i) => {
+          const label = moveLabelFromBoard(m.move, context.beforeBoard, context.side) || m.move;
+          const scoreText = formatRecommendationScore(m, context.side);
+          const matched = m.move === context.uci ? " ✓" : "";
+          return `${i + 1}. ${label} (${scoreText})${matched}`;
+        });
+      entry.annotation = annotation;
+      entry.bestLabel = bestLabel;
+      entry.bestScoreText = bestScoreText;
+      entry.lossText = lossText;
+      entry.playedScoreText = beforeScore != null && playedScore != null
+        ? `${formatScore(playedScore)} (${formatSwing(playedScore - beforeScore)})`
+        : formatScore(playedScore);
+      entry.lines = [
+        text("reviewMoveLine", annotation, entry.playedScoreText, text("reviewLossShort", lossText || "...")),
+        bestLabel ? text("reviewBestLine", bestLabel, bestScoreText) : "",
+        best?.move ? coachMoveText(best.move, context.beforeBoard, context.side) : "",
+        recLines.length ? text("recommendations", recLines.join("\n")) : "",
+      ].filter(Boolean);
+      entry.status = "done";
+    } catch (e) {
+      entry.status = "done";
+      entry.lines = [text("reviewFailedShort")];
+    } finally {
+      delete entry.promise;
+      if (modeSelect.value === "pgn" && entry.runId === pgnReviewRunId) {
+        renderHistory();
+        if (pgnIndex === targetIndex) pgnRenderAnalysis();
+      }
+    }
+    return entry;
+  })();
+
+  return entry.promise;
+}
+
+async function startPgnReviewAnalysis() {
+  const runId = ++pgnReviewRunId;
+  for (let i = 1; i <= pgnMoves.length; i += 1) {
+    if (runId !== pgnReviewRunId || modeSelect.value !== "pgn") return;
+    await pgnComputeAnalysis(i);
   }
-  // Re-render only if the user is currently viewing this position.
-  if (pgnIndex === targetIndex && modeSelect.value === "pgn") pgnRenderAnalysis();
 }
 
 function pgnApplyPosition() {
-  const parsed = parseFen(START_FEN);
-  board = parsed.board;
-  turn = parsed.turn;
+  const replay = pgnReplayTo(pgnIndex);
+  board = replay.board;
+  turn = replay.turn;
   selected = null;
   legalTargets = [];
-  history = [];
-  lastMove = null;
-  // Capture the position right before the move that brought us to pgnIndex.
-  let preBoard = null;
-  let preFen = null;
-  let preMover = null;
-  let playedUci = null;
-  for (let i = 0; i < pgnIndex; i += 1) {
-    const m = uciToMove(pgnMoves[i].uci);
-    if (!m) break;
-    const piece = board[m.fromR]?.[m.fromC];
-    if (!piece) break;
-    if (i === pgnIndex - 1) {
-      preBoard = cloneBoard();
-      preFen = boardToFen();
-      preMover = turn;
-      playedUci = pgnMoves[i].uci;
-    }
-    const captured = board[m.toR][m.toC];
-    history.push({ fromR: m.fromR, fromC: m.fromC, toR: m.toR, toC: m.toC, piece, captured, side: turn, source: "pgn" });
-    board[m.toR][m.toC] = piece;
-    board[m.fromR][m.fromC] = null;
-    lastMove = { fromR: m.fromR, fromC: m.fromC, toR: m.toR, toC: m.toC };
-    turn = turn === "red" ? "black" : "red";
-  }
+  history = replay.records.map(({ beforeBoard, beforeFen, afterFen, raw, index, uci, ...record }) => record);
+  const last = history.at(-1);
+  lastMove = last ? { fromR: last.fromR, fromC: last.fromC, toR: last.toR, toC: last.toC } : null;
   renderBoard();
   renderHistory();
   pgnUpdateNavUI();
@@ -3158,17 +4714,13 @@ function pgnApplyPosition() {
   pgnRenderAnalysis();
 
   // Make sure the current position's analysis is being computed (no-op if already cached).
-  if (pgnIndex > 0 && preFen && playedUci) {
-    pgnComputeAnalysis(pgnIndex, preFen, preBoard, preMover, playedUci);
+  if (pgnIndex > 0) {
+    pgnComputeAnalysis(pgnIndex);
   }
 
   // Prefetch the NEXT move's analysis so when the user advances, it's ready instantly.
   if (pgnIndex < pgnMoves.length) {
-    const nextFen = boardToFen();
-    const nextBoard = cloneBoard();
-    const nextMover = turn;
-    const nextUci = pgnMoves[pgnIndex].uci;
-    pgnComputeAnalysis(pgnIndex + 1, nextFen, nextBoard, nextMover, nextUci);
+    pgnComputeAnalysis(pgnIndex + 1);
   }
 }
 
@@ -3184,6 +4736,33 @@ function pgnUpdateNavUI() {
   pgnFirstBtn.disabled = pgnIndex <= 0;
   pgnNextBtn.disabled = pgnIndex >= pgnMoves.length;
   pgnLastBtn.disabled = pgnIndex >= pgnMoves.length;
+}
+
+function playFromPgnPosition() {
+  if (modeSelect.value !== "pgn") return;
+  pgnReviewRunId += 1;
+  const continuedHistory = history.map(record => ({ ...record, source: "review" }));
+  pgnNav.hidden = true;
+  modeSelect.value = "human";
+  modeSelect.dispatchEvent(new Event("change"));
+  history = continuedHistory;
+  selected = null;
+  legalTargets = [];
+  gameResult = null;
+  busy = false;
+  pgnMoves = [];
+  pgnIndex = 0;
+  pgnSourceText = "";
+  pgnSourceTitle = "";
+  pgnAnalysisCache.clear();
+  qs("#clocks").hidden = false;
+  undoBtn.disabled = false;
+  moveScore.textContent = text("playingFromReview");
+  renderBoard();
+  renderHistory();
+  startClock();
+  evaluatePosition();
+  triggerPreMoveAnalysis();
 }
 
 function pgnGoto(idx) {
@@ -3248,7 +4827,13 @@ pgnFirstBtn.addEventListener("click", () => pgnGoto(0));
 pgnPrevBtn.addEventListener("click", () => pgnGoto(pgnIndex - 1));
 pgnNextBtn.addEventListener("click", () => pgnGoto(pgnIndex + 1));
 pgnLastBtn.addEventListener("click", () => pgnGoto(pgnMoves.length));
+pgnPlayFromHereBtn.addEventListener("click", playFromPgnPosition);
 pgnImportAgain.addEventListener("click", openPgnOverlay);
+moveList.addEventListener("click", event => {
+  const btn = (event.target as HTMLElement | null)?.closest("button[data-pgn-index]") as HTMLElement | null;
+  if (!btn || modeSelect.value !== "pgn") return;
+  pgnGoto(Number(btn.dataset.pgnIndex) || 0);
+});
 
 window.addEventListener("keydown", e => {
   if (modeSelect.value !== "pgn" || pgnNav.hidden) return;
@@ -3273,6 +4858,10 @@ function hideStartupPicker() {
 }
 
 function pickMode(mode) {
+  if (mode === "library") {
+    openGameLibrary();
+    return;
+  }
   if (online && mode !== "online") onlineLeave();
   modeSelect.value = mode;
   modeSelect.dispatchEvent(new Event("change"));
@@ -3282,6 +4871,8 @@ function pickMode(mode) {
     pgnNav.hidden = true;
     pgnMoves = [];
     pgnIndex = 0;
+    pgnSourceText = "";
+    pgnSourceTitle = "";
     resetGameLocal();
     openPgnOverlay();
     return;
@@ -3296,6 +4887,7 @@ for (const btn of startupOptions) {
     if (!mode) return;
     if (mode === "ai" || mode === "trainer") {
       pendingSideMode = mode;
+      startupAiLevelWrap.hidden = mode !== "ai";
       startupModeStep.hidden = true;
       startupSideStep.hidden = false;
       return;
@@ -3317,6 +4909,7 @@ startupSideBack.addEventListener("click", () => {
   startupSideStep.hidden = true;
 });
 
+syncAiLevel(loadAiLevel());
 applyLanguage();
 setOnlineMode(modeSelect.value === "online");
 renderTrainerPanel();

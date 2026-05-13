@@ -13,5 +13,12 @@ contextBridge.exposeInMainWorld("api", {
     open: () => ipcRenderer.invoke("pgn:open-dialog"),
     readPath: path => ipcRenderer.invoke("pgn:read-path", { path }),
   },
+  pgnLibrary: {
+    importFile: () => ipcRenderer.invoke("pgn-library:import-dialog"),
+    importPath: path => ipcRenderer.invoke("pgn-library:import-path", { path }),
+    search: args => ipcRenderer.invoke("pgn-library:search", args),
+    readGame: id => ipcRenderer.invoke("pgn-library:read-game", { id }),
+    setFavorite: (id, favorite) => ipcRenderer.invoke("pgn-library:set-favorite", { id, favorite }),
+  },
   serverUrl: () => ipcRenderer.invoke("config:serverUrl"),
 });
