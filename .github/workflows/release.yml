@@ -2,14 +2,10 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - "**"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release tag to build, for example v1.0.3"
-        required: true
-        type: string
       pikafish_ref:
         description: "Pikafish git branch, tag, or commit to build"
         required: true
@@ -20,17 +16,12 @@ on:
         required: false
         default: "https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue"
         type: string
-      upload_to_release:
-        description: "Upload artifacts to the GitHub release for tag"
-        required: true
-        default: true
-        type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 env:
-  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  BUILD_ID: ${{ github.ref_name }}-${{ github.run_number }}
   PIKAFISH_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.pikafish_ref || 'master' }}
   NNUE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.nnue_url || 'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue' }}
 
@@ -57,7 +48,7 @@ jobs:
       - name: Upload NNUE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          name: pikafish-nnue-${{ env.BUILD_ID }}
           if-no-files-found: error
           retention-days: 1
           path: pikafish.nnue
@@ -68,10 +59,8 @@ jobs:
     needs: prepare-nnue
 
     steps:
-      - name: Check out release tag
+      - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -114,7 +103,7 @@ jobs:
       - name: Restore NNUE artifact
         uses: actions/download-artifact@v4
         with:
-          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          name: pikafish-nnue-${{ env.BUILD_ID }}
           path: .
 
       - name: Validate engine assets
@@ -152,7 +141,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xiangqi-linux-${{ env.RELEASE_TAG }}
+          name: xiangqi-linux-${{ env.BUILD_ID }}
           if-no-files-found: error
           path: |
             dist/*.AppImage
@@ -166,10 +155,8 @@ jobs:
     needs: prepare-nnue
 
     steps:
-      - name: Check out release tag
+      - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -215,7 +202,7 @@ jobs:
       - name: Restore NNUE artifact
         uses: actions/download-artifact@v4
         with:
-          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          name: pikafish-nnue-${{ env.BUILD_ID }}
           path: .
 
       - name: Validate engine assets
@@ -250,7 +237,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xiangqi-windows-${{ env.RELEASE_TAG }}
+          name: xiangqi-windows-${{ env.BUILD_ID }}
           if-no-files-found: error
           path: |
             dist/*.exe
@@ -263,10 +250,8 @@ jobs:
     needs: prepare-nnue
 
     steps:
-      - name: Check out release tag
+      - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -303,7 +288,7 @@ jobs:
       - name: Restore NNUE artifact
         uses: actions/download-artifact@v4
         with:
-          name: pikafish-nnue-${{ env.RELEASE_TAG }}
+          name: pikafish-nnue-${{ env.BUILD_ID }}
           path: .
 
       - name: Validate engine assets
@@ -351,93 +336,12 @@ jobs:
           fs.writeFileSync(`dist/${process.env.PLATFORM}-sha256.txt`, `${lines.join("\n")}\n`);
           NODE
 
-      - name: Stage macOS assets in draft release
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_release }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag="${RELEASE_TAG}"
-          gh release view "${tag}" >/dev/null 2>&1 || \
-            gh release create "${tag}" \
-              --draft \
-              --title "xiangqi ${tag}" \
-              --notes "Automated release artifacts for Windows, Linux, and macOS ARM64."
-          gh release upload "${tag}" \
-            dist/*.dmg \
-            dist/*.zip \
-            dist/macos-arm64-sha256.txt \
-            --clobber
-
       - name: Upload workflow artifacts
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.upload_to_release }}
         uses: actions/upload-artifact@v4
         with:
-          name: xiangqi-macos-arm64-${{ env.RELEASE_TAG }}
+          name: xiangqi-macos-arm64-${{ env.BUILD_ID }}
           if-no-files-found: error
           path: |
             dist/*.dmg
             dist/*.zip
             dist/macos-arm64-sha256.txt
-
-  publish-release:
-    name: Publish GitHub release
-    runs-on: ubuntu-latest
-    needs:
-      - build-linux
-      - build-windows
-      - build-macos-arm64
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_release }}
-
-    steps:
-      - name: Download workflow artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: xiangqi-*-${{ env.RELEASE_TAG }}
-          path: release-assets
-          merge-multiple: true
-
-      - name: List release assets
-        run: find release-assets -maxdepth 2 -type f -print | sort
-
-      - name: Upload to GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag="${RELEASE_TAG}"
-          version="${tag#v}"
-          gh release view "${tag}" >/dev/null 2>&1 || \
-            gh release create "${tag}" \
-              --draft \
-              --title "xiangqi ${tag}" \
-              --notes "Automated release artifacts for Windows, Linux, and macOS ARM64."
-          mapfile -d '' files < <(find release-assets -type f -print0)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::No release assets found."
-            exit 1
-          fi
-          gh release upload "${tag}" "${files[@]}" --clobber
-          mapfile -t assets < <(gh release view "${tag}" --json assets --jq '.assets[].name' | sort)
-          expected=(
-            "linux-sha256.txt"
-            "macos-arm64-sha256.txt"
-            "windows-sha256.txt"
-            "xiangqi-${version}-linux-amd64.deb"
-            "xiangqi-${version}-linux-x64.tar.gz"
-            "xiangqi-${version}-linux-x86_64.AppImage"
-            "xiangqi-${version}-mac-arm64.dmg"
-            "xiangqi-${version}-mac-arm64.zip"
-            "xiangqi-${version}-win-x64.exe"
-            "xiangqi-${version}-win-x64.zip"
-          )
-          for name in "${expected[@]}"; do
-            if ! printf '%s\n' "${assets[@]}" | grep -Fxq "${name}"; then
-              echo "::error::Missing release asset: ${name}"
-              exit 1
-            fi
-          done
-          gh release edit "${tag}" --draft=false
