@@ -10,13 +10,18 @@ const ROOT = path.resolve(__dirname, "../../..");
 const RENDERER_ROOT = path.resolve(ROOT, "src/renderer");
 
 const SERVER_URL = process.env.XIANGQI_SERVER_URL || "https://xiangqi.abecomputers.ca";
-const ENGINE_TIMEOUT_MS = Number(process.env.PIKAFISH_TIMEOUT_MS || 5000);
-const ENGINE_MOVETIME_MS = Number(process.env.PIKAFISH_MOVETIME_MS || 500);
+const ENGINE_TIMEOUT_MS = positiveNumber(process.env.PIKAFISH_TIMEOUT_MS, 15000);
+const ENGINE_MOVETIME_MS = positiveNumber(process.env.PIKAFISH_MOVETIME_MS, 500);
 const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
 const PGN_LIBRARY_VERSION = 1;
 const PGN_LIBRARY_SEARCH_LIMIT = 200;
 const engineFileName = process.platform === "win32" ? "pikafish.exe" : "pikafish";
 let pgnLibraryCache = null;
+
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function bundledPath(...parts) {
   return app.isPackaged ? path.join((process as any).resourcesPath, ...parts) : path.join(ROOT, ...parts);
@@ -24,7 +29,7 @@ function bundledPath(...parts) {
 
 const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath(engineFileName);
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
-const engineCwd = app.isPackaged ? (process as any).resourcesPath : ROOT;
+const engineCwd = process.env.PIKAFISH_PATH ? path.dirname(enginePath) : (app.isPackaged ? (process as any).resourcesPath : ROOT);
 
 function formatEngineExitCode(code) {
   if (code == null) return "unknown";
@@ -39,9 +44,14 @@ function engineExitMessage(code, signal, output = "") {
   if (process.platform === "win32" && code != null && (code >>> 0) === 0xC000001D) {
     parts.push("This usually means the Pikafish executable was built with CPU instructions this computer does not support. Use a generic x86-64 Pikafish build or set PIKAFISH_PATH to a compatible engine.");
   }
-  const tail = String(output).trim().split(/\r?\n/).filter(Boolean).slice(-3).join(" | ");
-  if (tail) parts.push(`Last engine output: ${tail}`);
+  const tail = engineOutputTail(output);
+  if (tail) parts.push(tail);
   return parts.join(" ");
+}
+
+function engineOutputTail(output = "") {
+  const tail = String(output).trim().split(/\r?\n/).filter(Boolean).slice(-3).join(" | ");
+  return tail ? `Last engine output: ${tail}` : "";
 }
 
 function sideFromFen(fen) {
@@ -95,27 +105,71 @@ function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = 
     if (!fs.existsSync(enginePath)) return reject(new Error("The pikafish executable was not found."));
     if (!fs.existsSync(nnuePath)) return reject(new Error("pikafish.nnue is missing beside the engine."));
 
+    const mpv = Math.max(1, Math.min(8, Number(multipv) || 1));
+    const thinkMs = Math.max(50, Math.min(3000, Number(movetime) || ENGINE_MOVETIME_MS));
+    const searchDepth = depth == null ? null : Math.max(1, Math.min(30, Number(depth) || 0));
+    const timeoutMs = Math.max(
+      ENGINE_TIMEOUT_MS,
+      searchDepth ? searchDepth * 2500 : thinkMs + 10000,
+    );
     const engine = spawn(enginePath, [], { cwd: engineCwd, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
+    let lineBuffer = "";
     let settled = false;
+    let phase = "startup";
+
     const timeout = setTimeout(() => {
       if (!settled) {
         settled = true;
         engine.kill("SIGKILL");
-        reject(new Error("Pikafish timed out."));
+        const tail = engineOutputTail(output);
+        reject(new Error(`Pikafish timed out during ${phase} after ${timeoutMs} ms.${tail ? ` ${tail}` : ""}`));
       }
-    }, ENGINE_TIMEOUT_MS);
+    }, timeoutMs);
+
+    const writeLine = line => {
+      if (!engine.stdin.writable) return;
+      engine.stdin.write(`${line}\n`);
+    };
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      try { writeLine("quit"); } catch { /* ignore */ }
+      resolve(parseEngineOutput(output, fen, mpv));
+    };
+
+    const handleLine = rawLine => {
+      const line = rawLine.trim();
+      if (!line || settled) return;
+      if (line.startsWith("bestmove ")) {
+        finish();
+        return;
+      }
+      if (line === "uciok" && phase === "uci") {
+        phase = "ready";
+        writeLine("setoption name Threads value 1");
+        writeLine(`setoption name EvalFile value ${nnuePath}`);
+        if (mpv > 1) writeLine(`setoption name MultiPV value ${mpv}`);
+        writeLine("isready");
+        return;
+      }
+      if (line === "readyok" && phase === "ready") {
+        phase = searchDepth ? `depth ${searchDepth} search` : `${thinkMs} ms search`;
+        writeLine(`position fen ${fen}`);
+        writeLine(searchDepth ? `go depth ${searchDepth}` : `go movetime ${thinkMs}`);
+      }
+    };
 
     engine.stdout.on("data", chunk => {
-      output += chunk.toString();
-      if (output.includes("\nbestmove ") || output.includes("\r\nbestmove ")) {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          try { engine.stdin.write("quit\n"); } catch { /* ignore */ }
-          resolve(parseEngineOutput(output, fen, multipv));
-        }
-      }
+      const text = chunk.toString();
+      output += text;
+      lineBuffer += text;
+      const lines = lineBuffer.split(/\r?\n/);
+      lineBuffer = lines.pop() || "";
+      for (const line of lines) handleLine(line);
+      if (/^bestmove\s+\S+/.test(lineBuffer.trim())) handleLine(lineBuffer);
     });
     engine.stderr.on("data", chunk => { output += chunk.toString(); });
     engine.on("error", err => {
@@ -125,13 +179,8 @@ function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = 
       if (!settled) { settled = true; clearTimeout(timeout); reject(new Error(engineExitMessage(code, signal, output))); }
     });
 
-    const mpv = Math.max(1, Math.min(8, Number(multipv) || 1));
-    const thinkMs = Math.max(50, Math.min(3000, Number(movetime) || ENGINE_MOVETIME_MS));
-    const searchDepth = depth == null ? null : Math.max(1, Math.min(30, Number(depth) || 0));
-    const initLines = ["uci", "setoption name Threads value 1"];
-    if (mpv > 1) initLines.push(`setoption name MultiPV value ${mpv}`);
-    initLines.push("isready", `position fen ${fen}`, searchDepth ? `go depth ${searchDepth}` : `go movetime ${thinkMs}`, "");
-    engine.stdin.write(initLines.join("\n"));
+    phase = "uci";
+    writeLine("uci");
   });
 }
 

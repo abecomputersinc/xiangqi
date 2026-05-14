@@ -3372,7 +3372,8 @@ async function trainerMaybeOpponentMove() {
   let failed = false;
   let ended = false;
   try {
-    const result = await enginePost("/api/topmoves", { fen, depth: Number(depthInput.value) + 1, count: 5 });
+    const profile = aiProfile();
+    const result = await enginePost("/api/topmoves", { fen, count: profile.count, movetime: Math.max(700, profile.movetime) });
     if (modeSelect.value !== "trainer" || fen !== boardToFen()) return;
     const move = uciToMove(chooseAiMove(result, turn));
     if (!isLegalParsedMove(move)) throw new Error(text("noLegalReply"));
