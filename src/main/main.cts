@@ -26,6 +26,24 @@ const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
 const engineCwd = app.isPackaged ? (process as any).resourcesPath : ROOT;
 
+function formatEngineExitCode(code) {
+  if (code == null) return "unknown";
+  if (process.platform !== "win32") return String(code);
+  const unsignedCode = code >>> 0;
+  const hexCode = `0x${unsignedCode.toString(16).toUpperCase().padStart(8, "0")}`;
+  return `${code} (${hexCode})`;
+}
+
+function engineExitMessage(code, signal, output = "") {
+  const parts = [`Pikafish exited (code ${formatEngineExitCode(code)}${signal ? `, signal ${signal}` : ""}).`];
+  if (process.platform === "win32" && code != null && (code >>> 0) === 0xC000001D) {
+    parts.push("This usually means the Pikafish executable was built with CPU instructions this computer does not support. Use a generic x86-64 Pikafish build or set PIKAFISH_PATH to a compatible engine.");
+  }
+  const tail = String(output).trim().split(/\r?\n/).filter(Boolean).slice(-3).join(" | ");
+  if (tail) parts.push(`Last engine output: ${tail}`);
+  return parts.join(" ");
+}
+
 function sideFromFen(fen) {
   return fen.trim().split(/\s+/)[1] || "w";
 }
@@ -103,8 +121,8 @@ function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = 
     engine.on("error", err => {
       if (!settled) { settled = true; clearTimeout(timeout); reject(err); }
     });
-    engine.on("exit", code => {
-      if (!settled) { settled = true; clearTimeout(timeout); reject(new Error(`Pikafish exited (code ${code}).`)); }
+    engine.on("exit", (code, signal) => {
+      if (!settled) { settled = true; clearTimeout(timeout); reject(new Error(engineExitMessage(code, signal, output))); }
     });
 
     const mpv = Math.max(1, Math.min(8, Number(multipv) || 1));

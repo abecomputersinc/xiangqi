@@ -122,6 +122,7 @@ The output is written to `dist/`. Because the app is unsigned and not notarized,
 ## Build Windows Client
 
 Windows builds must bundle a Windows Pikafish executable named `pikafish.exe`.
+Use a generic `x86-64` Pikafish build for releases. CPU-tuned builds such as AVX2/BMI2 can crash on older Windows PCs with exit code `3221225501` (`0xC000001D`, illegal instruction).
 
 Required files:
 
