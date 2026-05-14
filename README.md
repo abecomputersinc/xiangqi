@@ -187,7 +187,7 @@ Build runners:
 
 The macOS ARM64 runner must have `7zz` or `7z` available. If neither exists, the workflow installs `p7zip` with Homebrew.
 
-The workflow downloads `Pikafish.2026-01-02.7z` from the official `official-pikafish/Pikafish` release by default, bundles all engines for each target OS, copies the included `pikafish.nnue`, validates the engine files, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release. Runtime CPU selection happens on the user's computer.
+The workflow downloads [`Pikafish.2026-01-02.7z`](https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z) from the official [`official-pikafish/Pikafish`](https://github.com/official-pikafish/Pikafish) release by default, bundles all engines for each target OS, copies the included `pikafish.nnue`, validates the engine files, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release. Runtime CPU selection happens on the user's computer.
 
 ## Online Server
 
@@ -270,7 +270,7 @@ xiangqi source code is licensed under the GNU General Public License version 3. 
 
 Release artifacts can include third-party components with separate license terms:
 
-- `pikafish-engines/*`: Pikafish engines, licensed separately under GPLv3 by the Pikafish project. When redistributing them, include the GPLv3 license and a source-code pointer for the exact engine builds you ship.
+- `pikafish-engines/*`: Pikafish engines from [`official-pikafish/Pikafish`](https://github.com/official-pikafish/Pikafish), licensed separately under GPLv3 by the Pikafish project. The default bundled archive is [`Pikafish.2026-01-02.7z`](https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z); when redistributing different engine builds, include the GPLv3 license and a source-code pointer for those exact builds.
 - `pikafish.nnue`: Pikafish NNUE weights from the official Pikafish Networks release. The bundled weights are not for commercial use without permission from the rightsholder.
 
 Do not treat a packaged release that includes `pikafish.nnue` as approved for business or commercial use unless you have the required permission for those NNUE weights.
