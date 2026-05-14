@@ -29,25 +29,11 @@ env:
   PIKAFISH_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.pikafish_url || 'https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z' }}
 
 jobs:
-  build-linux:
-    name: Build Linux
+  prepare-pikafish:
+    name: Prepare Pikafish assets
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out release tag
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
       - name: Install archive tools
         run: |
           set -euo pipefail
@@ -74,38 +60,140 @@ jobs:
           mkdir -p "${release_dir}"
           7z x "${archive}" -o"${release_dir}" -y
 
-      - name: Install bundled Pikafish engines
+      - name: Prepare platform bundles
         shell: bash
         run: |
           set -euo pipefail
           release_dir="${RUNNER_TEMP}/pikafish-release"
-          platform_dir="$(find "${release_dir}" -type d -name Linux -print -quit)"
-          if [ -z "${platform_dir}" ]; then
-            echo "::error::Could not find the Linux engine directory in the Pikafish release archive."
-            find "${release_dir}" -maxdepth 3 -type d -print
+          assets_dir="${RUNNER_TEMP}/pikafish-assets"
+          rm -rf "${assets_dir}"
+          mkdir -p "${assets_dir}"
+
+          nnue_path="$(find "${release_dir}" -type f -name 'pikafish.nnue' -print -quit)"
+          if [ -z "${nnue_path}" ]; then
+            echo "::error::pikafish.nnue was not found in the Pikafish release archive."
+            exit 1
+          fi
+          install -m 644 "${nnue_path}" "${assets_dir}/pikafish.nnue"
+
+          copy_unix_engines() {
+            local archive_dir_name="$1"
+            local bundle_name="$2"
+            local label="$3"
+            local platform_dir
+            platform_dir="$(find "${release_dir}" -type d -name "${archive_dir_name}" -print -quit)"
+            if [ -z "${platform_dir}" ]; then
+              echo "::error::Could not find the ${label} engine directory in the Pikafish release archive."
+              find "${release_dir}" -maxdepth 3 -type d -print
+              exit 1
+            fi
+
+            local target_dir="${assets_dir}/${bundle_name}/pikafish-engines"
+            mkdir -p "${target_dir}"
+            while IFS= read -r engine_path; do
+              install -m 755 "${engine_path}" "${target_dir}/$(basename "${engine_path}")"
+            done < <(find "${platform_dir}" -maxdepth 1 -type f -name 'pikafish*' ! -name '*.nnue' | sort)
+            if ! find "${target_dir}" -maxdepth 1 -type f -name 'pikafish*' -print -quit | grep -q .; then
+              echo "::error::Could not find ${label} Pikafish engines in the release archive."
+              exit 1
+            fi
+          }
+
+          copy_windows_engines() {
+            local platform_dir
+            platform_dir="$(find "${release_dir}" -type d -name Windows -print -quit)"
+            if [ -z "${platform_dir}" ]; then
+              echo "::error::Could not find the Windows engine directory in the Pikafish release archive."
+              find "${release_dir}" -maxdepth 3 -type d -print
+              exit 1
+            fi
+
+            local target_dir="${assets_dir}/windows/pikafish-engines"
+            mkdir -p "${target_dir}"
+            while IFS= read -r engine_path; do
+              install -m 644 "${engine_path}" "${target_dir}/$(basename "${engine_path}")"
+            done < <(find "${platform_dir}" -maxdepth 1 -type f -name 'pikafish*.exe' | sort)
+            if ! find "${target_dir}" -maxdepth 1 -type f -name 'pikafish*.exe' -print -quit | grep -q .; then
+              echo "::error::Could not find Windows Pikafish engines in the release archive."
+              exit 1
+            fi
+          }
+
+          copy_unix_engines Linux linux Linux
+          copy_windows_engines
+          copy_unix_engines MacOS macos-arm64 macOS
+          find "${assets_dir}" -type f -print | sort
+
+      - name: Pack prepared Pikafish assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -C "${RUNNER_TEMP}/pikafish-assets" -czf "${RUNNER_TEMP}/pikafish-assets.tar.gz" .
+          tar -tzf "${RUNNER_TEMP}/pikafish-assets.tar.gz" | sort
+
+      - name: Upload prepared Pikafish assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: pikafish-assets-${{ env.RELEASE_TAG }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/pikafish-assets.tar.gz
+
+  build-linux:
+    name: Build Linux
+    needs: prepare-pikafish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download prepared Pikafish assets
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-assets-${{ env.RELEASE_TAG }}
+          path: pikafish-assets
+
+      - name: Extract prepared Pikafish assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf pikafish-assets/pikafish-assets.tar.gz -C pikafish-assets
+
+      - name: Install bundled Pikafish assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="pikafish-assets/linux/pikafish-engines"
+          if [ ! -d "${source_dir}" ]; then
+            echo "::error::The prepared Linux Pikafish engine bundle is missing."
             exit 1
           fi
           rm -rf pikafish-engines
           mkdir -p pikafish-engines
           while IFS= read -r engine_path; do
             install -m 755 "${engine_path}" "pikafish-engines/$(basename "${engine_path}")"
-          done < <(find "${platform_dir}" -maxdepth 1 -type f -name 'pikafish*' ! -name '*.nnue' | sort)
+          done < <(find "${source_dir}" -maxdepth 1 -type f -name 'pikafish*' | sort)
           if ! find pikafish-engines -maxdepth 1 -type f -name 'pikafish*' -print -quit | grep -q .; then
-            echo "::error::Could not find Linux Pikafish engines in the release archive."
+            echo "::error::Could not find Linux Pikafish engines in the prepared bundle."
             exit 1
           fi
+          if [ ! -s pikafish-assets/pikafish.nnue ]; then
+            echo "::error::pikafish.nnue is missing or empty in the prepared bundle."
+            exit 1
+          fi
+          install -m 644 pikafish-assets/pikafish.nnue pikafish.nnue
           find pikafish-engines -maxdepth 1 -type f -print | sort
-
-      - name: Install NNUE from Pikafish release archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          nnue_path="$(find "${RUNNER_TEMP}/pikafish-release" -type f -name 'pikafish.nnue' -print -quit)"
-          if [ -z "${nnue_path}" ]; then
-            echo "::error::pikafish.nnue was not found in the Pikafish release archive."
-            exit 1
-          fi
-          install -m 644 "${nnue_path}" pikafish.nnue
 
       - name: Validate engine assets
         shell: bash
@@ -158,6 +246,7 @@ jobs:
 
   build-windows:
     name: Build Windows
+    needs: prepare-pikafish
     runs-on: windows-latest
 
     steps:
@@ -175,79 +264,51 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download Pikafish release archive
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $archive = Join-Path $env:RUNNER_TEMP "pikafish.7z"
-          $extractDir = Join-Path $env:RUNNER_TEMP "pikafish-release"
-          curl.exe `
-            --fail `
-            --location `
-            --retry 5 `
-            --retry-delay 5 `
-            --retry-all-errors `
-            --connect-timeout 30 `
-            --max-time 300 `
-            "$env:PIKAFISH_URL" `
-            --output "$archive"
-          if (Test-Path -LiteralPath $extractDir) {
-            Remove-Item -LiteralPath $extractDir -Recurse -Force
-          }
-          New-Item -ItemType Directory -Path $extractDir | Out-Null
-          $sevenZipCommand = Get-Command 7z -ErrorAction SilentlyContinue
-          $sevenZip = if ($sevenZipCommand) { $sevenZipCommand.Source } else { $null }
-          if (!$sevenZip -and (Test-Path -LiteralPath "C:\Program Files\7-Zip\7z.exe")) {
-            $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          }
-          if (!$sevenZip) {
-            throw "7z was not found on the Windows runner."
-          }
-          & $sevenZip x "$archive" "-o$extractDir" -y
+      - name: Download prepared Pikafish assets
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-assets-${{ env.RELEASE_TAG }}
+          path: pikafish-assets
 
-      - name: Install bundled Pikafish engines
+      - name: Extract prepared Pikafish assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf pikafish-assets/pikafish-assets.tar.gz -C pikafish-assets
+
+      - name: Install bundled Pikafish assets
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $releaseDir = Join-Path $env:RUNNER_TEMP "pikafish-release"
-          $platformDir = Get-ChildItem -LiteralPath $releaseDir -Recurse -Directory |
-            Where-Object { $_.Name -eq "Windows" } |
-            Select-Object -First 1 -ExpandProperty FullName
-          if (!$platformDir) {
-            throw "Could not find the Windows engine directory in the Pikafish release archive."
+          $sourceDir = Join-Path (Get-Location) "pikafish-assets/windows/pikafish-engines"
+          if (!(Test-Path -LiteralPath $sourceDir)) {
+            throw "The prepared Windows Pikafish engine bundle is missing."
           }
           $targetDir = Join-Path (Get-Location) "pikafish-engines"
           if (Test-Path -LiteralPath $targetDir) {
             Remove-Item -LiteralPath $targetDir -Recurse -Force
           }
           New-Item -ItemType Directory -Path $targetDir | Out-Null
-          $engines = Get-ChildItem -LiteralPath $platformDir -File -Filter "pikafish*.exe" | Sort-Object Name
+          $engines = Get-ChildItem -LiteralPath $sourceDir -File -Filter "pikafish*.exe" | Sort-Object Name
           if (!$engines) {
-            throw "Could not find Windows Pikafish engines in the release archive."
+            throw "Could not find Windows Pikafish engines in the prepared bundle."
           }
           foreach ($engine in $engines) {
             Copy-Item -LiteralPath $engine.FullName -Destination (Join-Path $targetDir $engine.Name) -Force
           }
-          Get-ChildItem -LiteralPath $targetDir -File | Select-Object Name, Length | Format-Table -AutoSize
-
-      - name: Install NNUE from Pikafish release archive
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $releaseDir = Join-Path $env:RUNNER_TEMP "pikafish-release"
-          $nnuePath = Get-ChildItem -LiteralPath $releaseDir -Recurse -File -Filter "pikafish.nnue" |
-            Select-Object -First 1 -ExpandProperty FullName
-          if (!$nnuePath) {
-            throw "pikafish.nnue was not found in the Pikafish release archive."
+          $nnuePath = Join-Path (Get-Location) "pikafish-assets/pikafish.nnue"
+          if (!(Test-Path -LiteralPath $nnuePath)) {
+            throw "pikafish.nnue is missing from the prepared bundle."
           }
           Copy-Item -LiteralPath $nnuePath -Destination "pikafish.nnue" -Force
+          Get-ChildItem -LiteralPath $targetDir -File | Select-Object Name, Length | Format-Table -AutoSize
 
       - name: Validate engine assets
         shell: pwsh
         run: |
           if (!(Test-Path "pikafish-engines")) { throw "pikafish-engines was not created." }
           if (!(Get-ChildItem -LiteralPath "pikafish-engines" -File -Filter "pikafish*.exe")) { throw "No Windows Pikafish engines were copied." }
-          if (!(Test-Path "pikafish.nnue")) { throw "pikafish.nnue was not copied from the Pikafish release archive." }
+          if (!(Test-Path "pikafish.nnue")) { throw "pikafish.nnue was not copied from the prepared bundle." }
           Get-ChildItem pikafish-engines
           Get-Item pikafish.nnue | Format-Table Name, Length
 
@@ -285,7 +346,8 @@ jobs:
 
   build-macos-arm64:
     name: Build macOS ARM64
-    runs-on: [self-hosted, macOS, ARM64]
+    needs: prepare-pikafish
+    runs-on: macos-15
 
     steps:
       - name: Check out release tag
@@ -302,68 +364,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install archive tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          if command -v 7zz >/dev/null 2>&1 || command -v 7z >/dev/null 2>&1; then
-            exit 0
-          fi
-          brew install p7zip
+      - name: Download prepared Pikafish assets
+        uses: actions/download-artifact@v4
+        with:
+          name: pikafish-assets-${{ env.RELEASE_TAG }}
+          path: pikafish-assets
 
-      - name: Download Pikafish release archive
+      - name: Extract prepared Pikafish assets
         shell: bash
         run: |
           set -euo pipefail
-          archive="${RUNNER_TEMP}/pikafish.7z"
-          release_dir="${RUNNER_TEMP}/pikafish-release"
-          curl \
-            --fail \
-            --location \
-            --retry 5 \
-            --retry-delay 5 \
-            --retry-all-errors \
-            --connect-timeout 30 \
-            --max-time 300 \
-            "${PIKAFISH_URL}" \
-            -o "${archive}"
-          rm -rf "${release_dir}"
-          mkdir -p "${release_dir}"
-          sevenzip="$(command -v 7zz || command -v 7z)"
-          "${sevenzip}" x "${archive}" -o"${release_dir}" -y
+          tar -xzf pikafish-assets/pikafish-assets.tar.gz -C pikafish-assets
 
-      - name: Install bundled Pikafish engines
+      - name: Install bundled Pikafish assets
         shell: bash
         run: |
           set -euo pipefail
-          release_dir="${RUNNER_TEMP}/pikafish-release"
-          platform_dir="$(find "${release_dir}" -type d -name MacOS -print -quit)"
-          if [ -z "${platform_dir}" ]; then
-            echo "::error::Could not find the macOS engine directory in the Pikafish release archive."
-            find "${release_dir}" -maxdepth 3 -type d -print
+          source_dir="pikafish-assets/macos-arm64/pikafish-engines"
+          if [ ! -d "${source_dir}" ]; then
+            echo "::error::The prepared macOS ARM64 Pikafish engine bundle is missing."
             exit 1
           fi
           rm -rf pikafish-engines
           mkdir -p pikafish-engines
           while IFS= read -r engine_path; do
             install -m 755 "${engine_path}" "pikafish-engines/$(basename "${engine_path}")"
-          done < <(find "${platform_dir}" -maxdepth 1 -type f -name 'pikafish*' ! -name '*.nnue' | sort)
+          done < <(find "${source_dir}" -maxdepth 1 -type f -name 'pikafish*' | sort)
           if ! find pikafish-engines -maxdepth 1 -type f -name 'pikafish*' -print -quit | grep -q .; then
-            echo "::error::Could not find macOS Pikafish engines in the release archive."
+            echo "::error::Could not find macOS Pikafish engines in the prepared bundle."
             exit 1
           fi
+          if [ ! -s pikafish-assets/pikafish.nnue ]; then
+            echo "::error::pikafish.nnue is missing or empty in the prepared bundle."
+            exit 1
+          fi
+          install -m 644 pikafish-assets/pikafish.nnue pikafish.nnue
           find pikafish-engines -maxdepth 1 -type f -print | sort
-
-      - name: Install NNUE from Pikafish release archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          nnue_path="$(find "${RUNNER_TEMP}/pikafish-release" -type f -name 'pikafish.nnue' -print -quit)"
-          if [ -z "${nnue_path}" ]; then
-            echo "::error::pikafish.nnue was not found in the Pikafish release archive."
-            exit 1
-          fi
-          install -m 644 "${nnue_path}" pikafish.nnue
 
       - name: Validate engine assets
         shell: bash
@@ -382,20 +418,7 @@ jobs:
           }
 
       - name: Build packages
-        shell: bash
-        run: |
-          set -euo pipefail
-          build_dir="/private/tmp/xiangqi-macos-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          rm -rf "${build_dir}"
-          mkdir -p "${build_dir}"
-          git archive --format=tar HEAD | tar -C "${build_dir}" -xf -
-          cp -R pikafish-engines "${build_dir}/pikafish-engines"
-          cp pikafish.nnue "${build_dir}/pikafish.nnue"
-          npm ci --prefix "${build_dir}"
-          npm --prefix "${build_dir}" run dist:mac:arm64
-          rm -rf dist
-          mkdir -p dist
-          cp "${build_dir}"/dist/*.dmg "${build_dir}"/dist/*.zip dist/
+        run: npm run dist:mac:arm64
 
       - name: Write checksums
         shell: bash
@@ -416,28 +439,7 @@ jobs:
           fs.writeFileSync(`dist/${process.env.PLATFORM}-sha256.txt`, `${lines.join("\n")}\n`);
           NODE
 
-      - name: Stage macOS assets in draft release
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_release }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag="${RELEASE_TAG}"
-          gh release view "${tag}" >/dev/null 2>&1 || \
-            gh release create "${tag}" \
-              --draft \
-              --title "xiangqi ${tag}" \
-              --notes "Automated release artifacts for Windows, Linux, and macOS ARM64."
-          gh release upload "${tag}" \
-            dist/*.dmg \
-            dist/*.zip \
-            dist/macos-arm64-sha256.txt \
-            --clobber
-
       - name: Upload workflow artifacts
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.upload_to_release }}
         uses: actions/upload-artifact@v4
         with:
           name: xiangqi-macos-arm64-${{ env.RELEASE_TAG }}

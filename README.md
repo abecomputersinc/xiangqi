@@ -181,13 +181,12 @@ The repository includes `.github/workflows/release.yml` for automatic Windows, L
 
 Build runners:
 
+- Pikafish asset preparation: `ubuntu-latest`
 - Linux: `ubuntu-latest`
 - Windows: `windows-latest`
-- macOS ARM64: `[self-hosted, macOS, ARM64]`
+- macOS ARM64: `macos-15`
 
-The macOS ARM64 runner must have `7zz` or `7z` available. If neither exists, the workflow installs `p7zip` with Homebrew.
-
-The workflow downloads [`Pikafish.2026-01-02.7z`](https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z) from the official [`official-pikafish/Pikafish`](https://github.com/official-pikafish/Pikafish) release by default, bundles all engines for each target OS, copies the included `pikafish.nnue`, validates the engine files, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release. Runtime CPU selection happens on the user's computer.
+The workflow downloads [`Pikafish.2026-01-02.7z`](https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z) from the official [`official-pikafish/Pikafish`](https://github.com/official-pikafish/Pikafish) release once in the `prepare-pikafish` job, creates prepared bundles for Linux, Windows, and macOS ARM64, then shares those bundles with the three platform build jobs through a workflow artifact. Each build validates its engine files, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release. Runtime CPU selection happens on the user's computer.
 
 ## Online Server
 
