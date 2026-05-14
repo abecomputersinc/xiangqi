@@ -44,7 +44,7 @@ The client app runs in Electron. Renderer, main process, preload, and packaging 
 
 - Node.js 20+ recommended for the app/server.
 - npm.
-- A Pikafish executable and NNUE file for AI analysis.
+- Pikafish executable(s) and an NNUE file for AI analysis.
 - Electron dependencies installed with `npm install`.
 
 ## Install
@@ -55,12 +55,16 @@ npm install
 
 ## Engine Files
 
-The Electron client expects these files at the repository root:
+The Electron client uses `pikafish.nnue` plus either a single override engine or a bundled engine directory. For bundled releases, put all platform-compatible engines in `pikafish-engines/`; the app tries them from strongest to weakest on the user's computer and keeps the first one that starts.
 
 ```text
-pikafish
+pikafish-engines/
+  pikafish-avx2
+  pikafish-sse41-popcnt
 pikafish.nnue
 ```
+
+For local development, the old root-level `pikafish` or `pikafish.exe` fallback still works.
 
 You can override the paths:
 
@@ -107,7 +111,7 @@ XIANGQI_SERVER_URL=http://YOUR_COMPUTER_IP:4173 npm start
 
 The macOS package bundles:
 
-- `pikafish`
+- `pikafish-engines/`
 - `pikafish.nnue`
 
 Build unsigned macOS DMG and ZIP artifacts:
@@ -121,14 +125,13 @@ The output is written to `dist/`. Because the app is unsigned and not notarized,
 
 ## Build Windows Client
 
-Windows builds must bundle a Windows Pikafish executable named `pikafish.exe`.
-Use a generic `x86-64` Pikafish build for releases. CPU-tuned builds such as AVX2/BMI2 can crash on older Windows PCs with exit code `3221225501` (`0xC000001D`, illegal instruction).
+Windows builds bundle all Windows Pikafish executables from the official release archive. The app chooses the strongest binary that starts successfully on the user's CPU.
 
 Required files:
 
 ```text
-pikafish.exe                  # Windows executable
-pikafish.nnue                 # downloaded from official-pikafish/Networks if missing
+pikafish-engines/*.exe        # Windows executables
+pikafish.nnue                 # copied from the official Pikafish release archive
 ```
 
 Build unsigned Windows NSIS and ZIP artifacts:
@@ -139,29 +142,32 @@ npm run dist:win
 
 ## Build Linux Client
 
-Linux builds must bundle a Linux Pikafish executable. The checked-out local `pikafish` file may be a macOS binary, so replace it or build it from source before packaging on Linux.
+Linux builds bundle all Linux Pikafish executables from the official release archive. The app chooses the strongest binary that starts successfully on the user's CPU.
 
 Required files:
 
 ```text
-pikafish                      # Linux ELF executable, chmod +x
-pikafish.nnue                 # downloaded from official-pikafish/Networks if missing
+pikafish-engines/pikafish*    # Linux ELF executables, chmod +x
+pikafish.nnue                 # copied from the official Pikafish release archive
 ```
 
-Build Pikafish from source on Linux:
+For local packaging, download the official Pikafish archive and copy all Linux binaries plus the included NNUE file:
 
 ```sh
-git clone https://github.com/official-pikafish/Pikafish.git /tmp/pikafish
-make -C /tmp/pikafish/src -j"$(nproc)" profile-build
-install -m 755 /tmp/pikafish/src/pikafish ./pikafish
-file pikafish                 # should include "ELF"
+curl -fL https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z -o pikafish.7z
+7z x pikafish.7z -opikafish-release -y
+rm -rf pikafish-engines
+mkdir -p pikafish-engines
+find pikafish-release/Linux -maxdepth 1 -type f -name 'pikafish*' -exec install -m 755 {} pikafish-engines/ \;
+nnue_path="$(find pikafish-release -type f -name pikafish.nnue -print -quit)"
+install -m 644 "$nnue_path" ./pikafish.nnue
+file pikafish-engines/*       # should include "ELF"
 ```
 
 Then build Linux AppImage, DEB, and tar.gz artifacts:
 
 ```sh
 npm ci
-curl -fL https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue -o pikafish.nnue
 npm run dist:linux
 ```
 
@@ -170,8 +176,7 @@ npm run dist:linux
 The repository includes `.github/workflows/release.yml` for automatic Windows, Linux, and macOS ARM64 releases. It runs automatically when a tag matching `v*` is pushed, and can also be started manually from the Actions tab with:
 
 - release tag
-- Pikafish branch, tag, or commit to build
-- optional NNUE download URL
+- optional Pikafish release archive URL
 - whether to upload to the GitHub release
 
 Build runners:
@@ -180,9 +185,9 @@ Build runners:
 - Windows: `windows-latest`
 - macOS ARM64: `[self-hosted, macOS, ARM64]`
 
-The macOS ARM64 runner must have Xcode Command Line Tools available so `make` can compile Pikafish.
+The macOS ARM64 runner must have `7zz` or `7z` available. If neither exists, the workflow installs `p7zip` with Homebrew.
 
-The workflow builds Pikafish from `https://github.com/official-pikafish/Pikafish`, downloads `pikafish.nnue` from the official `official-pikafish/Networks` `master-net` release by default, validates the engine binary for each platform, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release.
+The workflow downloads `Pikafish.2026-01-02.7z` from the official `official-pikafish/Pikafish` release by default, bundles all engines for each target OS, copies the included `pikafish.nnue`, validates the engine files, packages Electron, uploads workflow artifacts, and publishes the files plus SHA-256 checksums to the GitHub release. Runtime CPU selection happens on the user's computer.
 
 ## Online Server
 
@@ -265,7 +270,7 @@ xiangqi source code is licensed under the GNU General Public License version 3. 
 
 Release artifacts can include third-party components with separate license terms:
 
-- `pikafish` / `pikafish.exe`: Pikafish engine, licensed separately under GPLv3 by the Pikafish project. When redistributing it, include the GPLv3 license and a source-code pointer for the exact engine build you ship.
+- `pikafish-engines/*`: Pikafish engines, licensed separately under GPLv3 by the Pikafish project. When redistributing them, include the GPLv3 license and a source-code pointer for the exact engine builds you ship.
 - `pikafish.nnue`: Pikafish NNUE weights from the official Pikafish Networks release. The bundled weights are not for commercial use without permission from the rightsholder.
 
 Do not treat a packaged release that includes `pikafish.nnue` as approved for business or commercial use unless you have the required permission for those NNUE weights.

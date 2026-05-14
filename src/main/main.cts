@@ -16,6 +16,67 @@ const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
 const PGN_LIBRARY_VERSION = 1;
 const PGN_LIBRARY_SEARCH_LIMIT = 200;
 const engineFileName = process.platform === "win32" ? "pikafish.exe" : "pikafish";
+const bundledEngineDirName = "pikafish-engines";
+const engineCandidateNames = {
+  win32: [
+    "pikafish-avx512icl.exe",
+    "pikafish-x86-64-avx512icl.exe",
+    "pikafish-vnni512.exe",
+    "pikafish-x86-64-vnni512.exe",
+    "pikafish-avx512.exe",
+    "pikafish-x86-64-avx512.exe",
+    "pikafish-avx512f.exe",
+    "pikafish-x86-64-avx512f.exe",
+    "pikafish-avxvnni.exe",
+    "pikafish-x86-64-avxvnni.exe",
+    "pikafish-bmi2.exe",
+    "pikafish-x86-64-bmi2.exe",
+    "pikafish-avx2.exe",
+    "pikafish-x86-64-avx2.exe",
+    "pikafish-sse41-popcnt.exe",
+    "pikafish-x86-64-sse41-popcnt.exe",
+    "pikafish-modern.exe",
+    "pikafish-x86-64-modern.exe",
+    "pikafish-ssse3.exe",
+    "pikafish-x86-64-ssse3.exe",
+    "pikafish-sse3-popcnt.exe",
+    "pikafish-x86-64-sse3-popcnt.exe",
+    "pikafish-x86-64.exe",
+    "pikafish.exe",
+  ],
+  darwin: [
+    "pikafish-apple-silicon",
+    "pikafish",
+  ],
+  linux: [
+    "pikafish-avx512icl",
+    "pikafish-x86-64-avx512icl",
+    "pikafish-vnni512",
+    "pikafish-x86-64-vnni512",
+    "pikafish-avx512",
+    "pikafish-x86-64-avx512",
+    "pikafish-avx512f",
+    "pikafish-x86-64-avx512f",
+    "pikafish-avxvnni",
+    "pikafish-x86-64-avxvnni",
+    "pikafish-bmi2",
+    "pikafish-x86-64-bmi2",
+    "pikafish-avx2",
+    "pikafish-x86-64-avx2",
+    "pikafish-sse41-popcnt",
+    "pikafish-x86-64-sse41-popcnt",
+    "pikafish-modern",
+    "pikafish-x86-64-modern",
+    "pikafish-ssse3",
+    "pikafish-x86-64-ssse3",
+    "pikafish-sse3-popcnt",
+    "pikafish-x86-64-sse3-popcnt",
+    "pikafish-x86-64",
+    "pikafish",
+  ],
+};
+let selectedEngine = null;
+let selectedEnginePromise = null;
 let pgnLibraryCache = null;
 
 function positiveNumber(value, fallback) {
@@ -27,9 +88,92 @@ function bundledPath(...parts) {
   return app.isPackaged ? path.join((process as any).resourcesPath, ...parts) : path.join(ROOT, ...parts);
 }
 
-const enginePath = process.env.PIKAFISH_PATH ? path.resolve(process.env.PIKAFISH_PATH) : bundledPath(engineFileName);
 const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
-const engineCwd = process.env.PIKAFISH_PATH ? path.dirname(enginePath) : (app.isPackaged ? (process as any).resourcesPath : ROOT);
+
+function addCandidate(candidates, seen, enginePath) {
+  if (!enginePath || seen.has(enginePath) || !fs.existsSync(enginePath)) return;
+  seen.add(enginePath);
+  candidates.push({ path: enginePath, cwd: path.dirname(enginePath), name: path.basename(enginePath) });
+}
+
+function getEngineCandidates() {
+  const candidates = [];
+  const seen = new Set();
+  if (process.env.PIKAFISH_PATH) {
+    addCandidate(candidates, seen, path.resolve(process.env.PIKAFISH_PATH));
+    return candidates;
+  }
+
+  const platformNames = engineCandidateNames[process.platform] || [engineFileName];
+  const engineDir = bundledPath(bundledEngineDirName);
+  for (const name of platformNames) {
+    addCandidate(candidates, seen, path.join(engineDir, name));
+  }
+  if (fs.existsSync(engineDir)) {
+    for (const name of fs.readdirSync(engineDir).sort()) {
+      if (!name.toLowerCase().startsWith("pikafish")) continue;
+      if (process.platform === "win32" && !name.toLowerCase().endsWith(".exe")) continue;
+      addCandidate(candidates, seen, path.join(engineDir, name));
+    }
+  }
+
+  addCandidate(candidates, seen, bundledPath(engineFileName));
+  return candidates;
+}
+
+function testEngineCandidate(candidate) {
+  return new Promise(resolve => {
+    const engine = spawn(candidate.path, [], { cwd: candidate.cwd, stdio: ["pipe", "pipe", "pipe"] });
+    let output = "";
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      engine.kill("SIGKILL");
+      resolve(false);
+    }, 5000);
+
+    const finish = ok => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      try { engine.kill(); } catch { /* ignore */ }
+      resolve(ok);
+    };
+
+    engine.stdout.on("data", chunk => {
+      output += chunk.toString();
+      if (/\breadyok\b/.test(output)) finish(true);
+    });
+    engine.stdin.on("error", () => { /* unsupported binaries can exit before stdin writes finish */ });
+    engine.on("error", () => finish(false));
+    engine.on("exit", () => finish(/\breadyok\b/.test(output)));
+    try {
+      engine.stdin.end("uci\nisready\nquit\n");
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+async function resolvePikafishEngine() {
+  if (selectedEngine) return selectedEngine;
+  if (selectedEnginePromise) return selectedEnginePromise;
+  selectedEnginePromise = (async () => {
+    const candidates = getEngineCandidates();
+    for (const candidate of candidates) {
+      if (await testEngineCandidate(candidate)) {
+        selectedEngine = candidate;
+        return candidate;
+      }
+    }
+    const checked = candidates.map(candidate => candidate.path).join(", ");
+    throw new Error(`No compatible Pikafish executable was found for this computer.${checked ? ` Checked: ${checked}` : ""}`);
+  })().finally(() => {
+    selectedEnginePromise = null;
+  });
+  return selectedEnginePromise;
+}
 
 function formatEngineExitCode(code) {
   if (code == null) return "unknown";
@@ -42,7 +186,7 @@ function formatEngineExitCode(code) {
 function engineExitMessage(code, signal, output = "") {
   const parts = [`Pikafish exited (code ${formatEngineExitCode(code)}${signal ? `, signal ${signal}` : ""}).`];
   if (process.platform === "win32" && code != null && (code >>> 0) === 0xC000001D) {
-    parts.push("This usually means the Pikafish executable was built with CPU instructions this computer does not support. Use a generic x86-64 Pikafish build or set PIKAFISH_PATH to a compatible engine.");
+    parts.push("This usually means the Pikafish executable uses CPU instructions this computer does not support. The app normally tries bundled engines from strongest to weakest; set PIKAFISH_PATH to a compatible engine if this persists.");
   }
   const tail = engineOutputTail(output);
   if (tail) parts.push(tail);
@@ -100,11 +244,10 @@ function parseEngineOutput(output, fen, multipv = 1) {
   return { bestMove, ponder, score: redScore, mate: redMate, pv: top.pv, moves };
 }
 
-function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = null } = {}) {
+async function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = null } = {}) {
+  if (!fs.existsSync(nnuePath)) throw new Error("pikafish.nnue is missing beside the engine.");
+  const selected = await resolvePikafishEngine();
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(enginePath)) return reject(new Error("The pikafish executable was not found."));
-    if (!fs.existsSync(nnuePath)) return reject(new Error("pikafish.nnue is missing beside the engine."));
-
     const mpv = Math.max(1, Math.min(8, Number(multipv) || 1));
     const thinkMs = Math.max(50, Math.min(3000, Number(movetime) || ENGINE_MOVETIME_MS));
     const searchDepth = depth == null ? null : Math.max(1, Math.min(30, Number(depth) || 0));
@@ -112,7 +255,7 @@ function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = 
       ENGINE_TIMEOUT_MS,
       searchDepth ? searchDepth * 2500 : thinkMs + 10000,
     );
-    const engine = spawn(enginePath, [], { cwd: engineCwd, stdio: ["pipe", "pipe", "pipe"] });
+    const engine = spawn(selected.path, [], { cwd: selected.cwd, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
     let lineBuffer = "";
     let settled = false;
@@ -212,13 +355,25 @@ app.on("activate", () => {
 
 // ---- IPC: engine ----
 
-ipcMain.handle("engine:status", async () => ({
-  engine: fs.existsSync(enginePath),
-  nnue: fs.existsSync(nnuePath),
-  platform: process.platform,
-  enginePath,
-  nnuePath,
-}));
+ipcMain.handle("engine:status", async () => {
+  let engine = null;
+  let engineError = "";
+  try {
+    engine = await resolvePikafishEngine();
+  } catch (err) {
+    engineError = err instanceof Error ? err.message : String(err);
+  }
+  return {
+    engine: Boolean(engine),
+    nnue: fs.existsSync(nnuePath),
+    platform: process.platform,
+    enginePath: engine?.path || "",
+    engineName: engine?.name || "",
+    engineError,
+    engineCandidates: getEngineCandidates().map(candidate => candidate.path),
+    nnuePath,
+  };
+});
 
 ipcMain.handle("engine:evaluate", async (_, args: any = {}) => {
   if (!args.fen) throw new Error("Missing FEN");

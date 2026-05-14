@@ -5,6 +5,7 @@ node_modules/
 # Large local/runtime assets
 pikafish
 pikafish.exe
+pikafish-engines/
 pikafish.nnue
 
 # Runtime data
