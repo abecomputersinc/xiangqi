@@ -15,8 +15,10 @@ const ENGINE_MOVETIME_MS = positiveNumber(process.env.PIKAFISH_MOVETIME_MS, 500)
 const MAX_PGN_IMPORT_BYTES = 4 * 1024 * 1024;
 const PGN_LIBRARY_VERSION = 1;
 const PGN_LIBRARY_SEARCH_LIMIT = 200;
+const ENGINE_PROBE_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1";
 const engineFileName = process.platform === "win32" ? "pikafish.exe" : "pikafish";
 const bundledEngineDirName = "pikafish-engines";
+const nnueFileName = "pikafish.nnue";
 const engineCandidateNames = {
   win32: [
     "pikafish-avx512icl.exe",
@@ -88,7 +90,32 @@ function bundledPath(...parts) {
   return app.isPackaged ? path.join((process as any).resourcesPath, ...parts) : path.join(ROOT, ...parts);
 }
 
-const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath("pikafish.nnue");
+const nnuePath = process.env.PIKAFISH_NNUE ? path.resolve(process.env.PIKAFISH_NNUE) : bundledPath(nnueFileName);
+
+function getNnueStatus() {
+  try {
+    const stat = fs.statSync(nnuePath);
+    if (!stat.isFile()) return { ok: false, error: `${nnueFileName} is not a file at ${nnuePath}.` };
+    if (stat.size <= 0) return { ok: false, error: `${nnueFileName} is empty at ${nnuePath}.` };
+    return { ok: true, error: "" };
+  } catch {
+    return { ok: false, error: `${nnueFileName} is missing at ${nnuePath}.` };
+  }
+}
+
+function requireNnueFile() {
+  const status = getNnueStatus();
+  if (!status.ok) throw new Error(status.error);
+  return getNnueFile();
+}
+
+function getNnueFile() {
+  return {
+    path: nnuePath,
+    cwd: path.dirname(nnuePath),
+    evalFile: path.basename(nnuePath),
+  };
+}
 
 function addCandidate(candidates, seen, enginePath) {
   if (!enginePath || seen.has(enginePath) || !fs.existsSync(enginePath)) return;
@@ -121,17 +148,19 @@ function getEngineCandidates() {
   return candidates;
 }
 
-function testEngineCandidate(candidate) {
+function testEngineCandidate(candidate, nnue = null) {
   return new Promise(resolve => {
-    const engine = spawn(candidate.path, [], { cwd: candidate.cwd, stdio: ["pipe", "pipe", "pipe"] });
+    const engine = spawn(candidate.path, [], { cwd: nnue?.cwd || candidate.cwd, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
+    let lineBuffer = "";
     let settled = false;
+    let phase = "uci";
     const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
       engine.kill("SIGKILL");
       resolve(false);
-    }, 5000);
+    }, nnue ? 10000 : 5000);
 
     const finish = ok => {
       if (settled) return;
@@ -141,15 +170,56 @@ function testEngineCandidate(candidate) {
       resolve(ok);
     };
 
+    const writeLine = line => {
+      if (!engine.stdin.writable) return;
+      engine.stdin.write(`${line}\n`);
+    };
+
+    const handleLine = rawLine => {
+      const line = rawLine.trim();
+      if (!line || settled) return;
+      if (/\bERROR\b/i.test(line)) {
+        finish(false);
+        return;
+      }
+      if (line === "uciok" && phase === "uci") {
+        phase = "ready";
+        writeLine("setoption name Threads value 1");
+        if (nnue) writeLine(`setoption name EvalFile value ${nnue.evalFile}`);
+        writeLine("isready");
+        return;
+      }
+      if (line === "readyok" && phase === "ready") {
+        if (!nnue) {
+          finish(true);
+          return;
+        }
+        phase = "search";
+        writeLine(`position fen ${ENGINE_PROBE_FEN}`);
+        writeLine("go depth 1");
+        return;
+      }
+      if (line.startsWith("bestmove ")) finish(true);
+    };
+
     engine.stdout.on("data", chunk => {
+      const text = chunk.toString();
+      output += text;
+      lineBuffer += text;
+      const lines = lineBuffer.split(/\r?\n/);
+      lineBuffer = lines.pop() || "";
+      for (const line of lines) handleLine(line);
+      if (/^bestmove\s+\S+/.test(lineBuffer.trim())) handleLine(lineBuffer);
+    });
+    engine.stderr.on("data", chunk => {
       output += chunk.toString();
-      if (/\breadyok\b/.test(output)) finish(true);
+      if (/\bERROR\b/i.test(output)) finish(false);
     });
     engine.stdin.on("error", () => { /* unsupported binaries can exit before stdin writes finish */ });
     engine.on("error", () => finish(false));
-    engine.on("exit", () => finish(/\breadyok\b/.test(output)));
+    engine.on("exit", () => finish(/\bbestmove\b/.test(output) || (!nnue && /\breadyok\b/.test(output))));
     try {
-      engine.stdin.end("uci\nisready\nquit\n");
+      writeLine("uci");
     } catch {
       finish(false);
     }
@@ -161,14 +231,16 @@ async function resolvePikafishEngine() {
   if (selectedEnginePromise) return selectedEnginePromise;
   selectedEnginePromise = (async () => {
     const candidates = getEngineCandidates();
+    const nnue = getNnueStatus().ok ? getNnueFile() : null;
     for (const candidate of candidates) {
-      if (await testEngineCandidate(candidate)) {
+      if (await testEngineCandidate(candidate, nnue)) {
         selectedEngine = candidate;
         return candidate;
       }
     }
     const checked = candidates.map(candidate => candidate.path).join(", ");
-    throw new Error(`No compatible Pikafish executable was found for this computer.${checked ? ` Checked: ${checked}` : ""}`);
+    const requirement = nnue ? " that can start, load the NNUE file, and complete a search" : "";
+    throw new Error(`No compatible Pikafish executable${requirement} was found for this computer.${checked ? ` Checked: ${checked}` : ""}`);
   })().finally(() => {
     selectedEnginePromise = null;
   });
@@ -245,7 +317,7 @@ function parseEngineOutput(output, fen, multipv = 1) {
 }
 
 async function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, depth = null } = {}) {
-  if (!fs.existsSync(nnuePath)) throw new Error("pikafish.nnue is missing beside the engine.");
+  const nnue = requireNnueFile();
   const selected = await resolvePikafishEngine();
   return new Promise((resolve, reject) => {
     const mpv = Math.max(1, Math.min(8, Number(multipv) || 1));
@@ -255,7 +327,7 @@ async function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, de
       ENGINE_TIMEOUT_MS,
       searchDepth ? searchDepth * 2500 : thinkMs + 10000,
     );
-    const engine = spawn(selected.path, [], { cwd: selected.cwd, stdio: ["pipe", "pipe", "pipe"] });
+    const engine = spawn(selected.path, [], { cwd: nnue.cwd, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
     let lineBuffer = "";
     let settled = false;
@@ -293,7 +365,7 @@ async function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, de
       if (line === "uciok" && phase === "uci") {
         phase = "ready";
         writeLine("setoption name Threads value 1");
-        writeLine(`setoption name EvalFile value ${nnuePath}`);
+        writeLine(`setoption name EvalFile value ${nnue.evalFile}`);
         if (mpv > 1) writeLine(`setoption name MultiPV value ${mpv}`);
         writeLine("isready");
         return;
@@ -319,7 +391,14 @@ async function runPikafish(fen, { multipv = 1, movetime = ENGINE_MOVETIME_MS, de
       if (!settled) { settled = true; clearTimeout(timeout); reject(err); }
     });
     engine.on("exit", (code, signal) => {
-      if (!settled) { settled = true; clearTimeout(timeout); reject(new Error(engineExitMessage(code, signal, output))); }
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        const nnueDetail = /\bEvalFile\b/.test(output)
+          ? ` NNUE path: ${nnue.path}. Engine working directory: ${nnue.cwd}. EvalFile: ${nnue.evalFile}.`
+          : "";
+        reject(new Error(`${engineExitMessage(code, signal, output)}${nnueDetail}`));
+      }
     });
 
     phase = "uci";
@@ -358,6 +437,7 @@ app.on("activate", () => {
 ipcMain.handle("engine:status", async () => {
   let engine = null;
   let engineError = "";
+  const nnueStatus = getNnueStatus();
   try {
     engine = await resolvePikafishEngine();
   } catch (err) {
@@ -365,13 +445,16 @@ ipcMain.handle("engine:status", async () => {
   }
   return {
     engine: Boolean(engine),
-    nnue: fs.existsSync(nnuePath),
+    nnue: nnueStatus.ok,
     platform: process.platform,
     enginePath: engine?.path || "",
     engineName: engine?.name || "",
     engineError,
     engineCandidates: getEngineCandidates().map(candidate => candidate.path),
     nnuePath,
+    nnueError: nnueStatus.error,
+    nnueWorkingDirectory: nnueStatus.ok ? path.dirname(nnuePath) : "",
+    nnueEvalFile: nnueStatus.ok ? path.basename(nnuePath) : "",
   };
 });
 
